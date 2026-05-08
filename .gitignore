@@ -1,0 +1,24 @@
+# Local-only files (secrets, kubeconfigs, machine-specific overrides)
+.env
+.env.*
+*.local.yaml
+*.local.yml
+secrets/
+kubeconfig
+kubeconfig.*
+
+# Helm
+charts/*/charts/
+*.tgz
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Lima state (in case anyone runs lima from inside the repo)
+.lima/
