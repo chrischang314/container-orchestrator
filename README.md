@@ -37,6 +37,33 @@ make deploy        # apply every app under apps/
 make status        # show cluster + apps + ingress URLs
 ```
 
+## Day-1 setup, end to end
+
+1. **Enable Kubernetes in Docker Desktop** —
+   see [`platform/docker-desktop/enable-k8s.md`](platform/docker-desktop/enable-k8s.md).
+
+2. **Wire CI in each app repo first** — `make deploy` pulls images from
+   GHCR, so they have to exist. Drop the workflow from
+   [`ci/templates/install.md`](ci/templates/install.md) into each app repo,
+   customize the matrix, and push. The first push builds and publishes
+   the images.
+
+3. **Bootstrap the platform.** `make bootstrap` installs ingress-nginx,
+   cert-manager (dormant), and Keel, and prompts for a GHCR Personal
+   Access Token (`read:packages` scope) so the cluster can pull private
+   images. Keep the PAT — Keel uses the same secret to poll GHCR.
+
+4. **Configure each app.** Add a directory under `apps/<name>/` with a
+   `values.yaml` modeled on
+   [`apps/local-llm/values.yaml`](apps/local-llm/values.yaml).
+
+5. **Deploy.** `make deploy` runs `helm upgrade --install` for every app.
+   `make status` prints the ingress hostnames and the Mac's LAN IP.
+
+6. **Make hostnames resolve.** Add ingress hosts to `/etc/hosts` on the
+   Mac (`127.0.0.1`) and on any LAN device that should reach the apps
+   (the Mac's LAN IP).
+
 ## Repo layout
 
 ```
