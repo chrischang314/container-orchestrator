@@ -1,0 +1,57 @@
+# Default values for the generic app chart.
+# Every app under apps/<name>/values.yaml overrides what it needs.
+
+namespace: default
+nameOverride: ""             # defaults to the helm release name
+
+imagePullSecrets:
+  - name: ghcr-creds
+
+# List of services that make up this app. Each becomes one Deployment +
+# (optionally) one Service + one PVC per persistence entry.
+services: []
+# Example shape (kept here for reference, not active):
+# services:
+#   - name: backend
+#     image: ghcr.io/chrischang314/local-llm/backend
+#     tag: main                   # poll target
+#     port: 8000                  # container port; omitted = no Service
+#     replicas: 1
+#     autoDeploy:
+#       enabled: true
+#       pollSchedule: "@every 5m"
+#     env:
+#       - name: OLLAMA_URL
+#         value: http://host.docker.internal:11434
+#     envFrom: []                 # configmap/secret refs
+#     resources:
+#       requests:
+#         cpu: 50m
+#         memory: 64Mi
+#       limits:
+#         memory: 256Mi
+#     probes:
+#       liveness:
+#         httpGet: { path: /healthz, port: 8000 }
+#         initialDelaySeconds: 10
+#       readiness:
+#         httpGet: { path: /healthz, port: 8000 }
+#     persistence:
+#       - name: data
+#         size: 1Gi
+#         mountPath: /app/data
+#         accessMode: ReadWriteOnce   # default
+#         # storageClassName: local-path   # omit to use the cluster's default
+
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  hosts: []
+  # - host: local-llm.lan
+  #   paths:
+  #     - path: /
+  #       pathType: Prefix
+  #       service: frontend
+  #       port: 80
+  tls: []                      # populate when cert-manager + ClusterIssuer are configured

@@ -1,0 +1,22 @@
+{{ default .Release.Name .Values.nameOverride }} is deployed.
+
+Services:
+{{- range .Values.services }}
+  - {{ .name }}: {{ .image }}:{{ default "main" .tag }}{{ if .port }} (port {{ .port }}){{ end }}
+{{- end }}
+{{- if .Values.ingress.enabled }}
+
+Ingress hostnames (add these to /etc/hosts on any device that should reach the app):
+{{- range .Values.ingress.hosts }}
+  127.0.0.1  {{ .host }}    # → http://{{ .host }}{{ (first .paths).path }}
+{{- end }}
+
+To reach from other devices on the LAN, replace 127.0.0.1 with this Mac's
+LAN IP (e.g. `ipconfig getifaddr en0`).
+{{- end }}
+
+Auto-deploy: Keel polls GHCR every 5 minutes (per-deployment annotation).
+On push of a new image with the tracked tag, the Deployment will roll over
+within ~5 minutes. Watch with:
+
+  kubectl rollout status deployment/<service-name>

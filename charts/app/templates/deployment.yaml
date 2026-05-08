@@ -1,0 +1,97 @@
+{{- range $svc := .Values.services }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "app.serviceFullname" (dict "root" $ "service" $svc) }}
+  namespace: {{ $.Values.namespace | default "default" }}
+  labels:
+    {{- include "app.serviceLabels" (dict "root" $ "service" $svc) | nindent 4 }}
+  annotations:
+    {{- $auto := default (dict) $svc.autoDeploy }}
+    {{- if (dig "enabled" true $auto) }}
+    keel.sh/policy: force
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: {{ default "@every 5m" $auto.pollSchedule | quote }}
+    keel.sh/match-tag: "true"
+    {{- end }}
+spec:
+  replicas: {{ default 1 $svc.replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      {{- include "app.selectorLabels" (dict "root" $ "service" $svc) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "app.selectorLabels" (dict "root" $ "service" $svc) | nindent 8 }}
+    spec:
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ $svc.name }}
+          image: "{{ $svc.image }}:{{ default "main" $svc.tag }}"
+          imagePullPolicy: Always
+          {{- if $svc.command }}
+          command: {{ toYaml $svc.command | nindent 12 }}
+          {{- end }}
+          {{- if $svc.args }}
+          args: {{ toYaml $svc.args | nindent 12 }}
+          {{- end }}
+          {{- if $svc.port }}
+          ports:
+            - name: http
+              containerPort: {{ $svc.port }}
+              protocol: TCP
+          {{- end }}
+          {{- with $svc.env }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $svc.envFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $svc.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $svc.probes }}
+          {{- with .liveness }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .readiness }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .startup }}
+          startupProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          {{- if $svc.persistence }}
+          volumeMounts:
+            {{- range $svc.persistence }}
+            - name: {{ .name }}
+              mountPath: {{ .mountPath }}
+              {{- if .subPath }}
+              subPath: {{ .subPath }}
+              {{- end }}
+            {{- end }}
+          {{- end }}
+      {{- if $svc.persistence }}
+      volumes:
+        {{- range $svc.persistence }}
+        - name: {{ .name }}
+          persistentVolumeClaim:
+            claimName: {{ include "app.serviceFullname" (dict "root" $ "service" $svc) }}-{{ .name }}
+        {{- end }}
+      {{- end }}
+{{- end }}

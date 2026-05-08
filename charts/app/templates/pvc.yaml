@@ -1,0 +1,21 @@
+{{- range $svc := .Values.services }}
+{{- range $pvc := default (list) $svc.persistence }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "app.serviceFullname" (dict "root" $ "service" $svc) }}-{{ $pvc.name }}
+  namespace: {{ $.Values.namespace | default "default" }}
+  labels:
+    {{- include "app.serviceLabels" (dict "root" $ "service" $svc) | nindent 4 }}
+spec:
+  accessModes:
+    - {{ default "ReadWriteOnce" $pvc.accessMode }}
+  resources:
+    requests:
+      storage: {{ $pvc.size | default "1Gi" }}
+  {{- if $pvc.storageClassName }}
+  storageClassName: {{ $pvc.storageClassName }}
+  {{- end }}
+{{- end }}
+{{- end }}
