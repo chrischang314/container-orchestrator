@@ -1,0 +1,44 @@
+# Lima VM hosting a k3s agent. Used on the SECOND (and beyond) Mac Mini.
+#
+# Before bringing this up:
+#   1. From the server Mac:
+#        limactl shell lima-k3s-server sudo cat /var/lib/rancher/k3s/server/node-token
+#      Save this as $K3S_TOKEN.
+#   2. Note the server VM's LAN IP (only available if you uncommented the
+#      vmnet `networks` block in lima-server.yaml on the server Mac):
+#        limactl shell lima-k3s-server ip -4 addr show lima0
+#   3. Set both below before running ./platform/k3s/up.sh --agent.
+
+vmType: vz
+arch: aarch64
+
+images:
+  - location: "https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-arm64.img"
+    arch: "aarch64"
+
+cpus: 2
+memory: "4GiB"
+disk: "20GiB"
+
+# Required for LAN-routable connectivity to the server VM
+networks:
+  - lima: shared
+
+env:
+  K3S_URL: "https://CHANGE_ME_SERVER_LAN_IP:6443"
+  K3S_TOKEN: "CHANGE_ME_NODE_TOKEN"
+
+provision:
+  - mode: system
+    script: |
+      #!/bin/bash
+      set -eux -o pipefail
+      # K3S_URL + K3S_TOKEN env triggers agent mode
+      curl -sfL https://get.k3s.io | sh -
+
+probes:
+  - description: "k3s agent registered"
+    script: |
+      #!/bin/bash
+      set -eu -o pipefail
+      timeout 120 bash -c 'until sudo systemctl is-active --quiet k3s-agent; do sleep 3; done'

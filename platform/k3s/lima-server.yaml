@@ -1,0 +1,54 @@
+# Lima VM hosting the k3s server (control plane + worker).
+# Used on the FIRST Mac Mini in the cluster.
+#
+# Bring up with:
+#   ./platform/k3s/up.sh           # or: make k3s-up
+
+vmType: vz                       # Apple Virtualization Framework — fast on M-series
+arch: aarch64
+
+images:
+  - location: "https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-arm64.img"
+    arch: "aarch64"
+
+cpus: 2
+memory: "4GiB"
+disk: "20GiB"
+
+# At migration time, uncomment to give the VM a LAN-routable IP via socket_vmnet.
+# Required for: (a) other LAN devices reaching ingress, (b) future agent VMs
+# on other Mac Minis joining this server. Install with:
+#   brew install socket_vmnet
+#   limactl sudoers >etc.sudoers.d/lima && sudo install -m 0440 etc.sudoers.d/lima /etc/sudoers.d/
+#
+# networks:
+#   - lima: shared
+
+mounts: []                       # k3s state lives in the VM, not on host
+
+provision:
+  - mode: system
+    script: |
+      #!/bin/bash
+      set -eux -o pipefail
+      # Install k3s server. Disable Traefik — we install ingress-nginx ourselves
+      # via platform/bootstrap.sh for parity with Docker Desktop K8s.
+      curl -sfL https://get.k3s.io | \
+        INSTALL_K3S_EXEC="server --disable=traefik --write-kubeconfig-mode=644" sh -
+      # Wait for k3s to be ready before lima reports the VM as up
+      until k3s kubectl get nodes >/dev/null 2>&1; do sleep 2; done
+
+probes:
+  - description: "k3s ready"
+    script: |
+      #!/bin/bash
+      set -eu -o pipefail
+      timeout 180 bash -c 'until sudo k3s kubectl get nodes 2>/dev/null | grep -q " Ready "; do sleep 3; done'
+
+message: |
+  k3s server is up inside this VM. Run from your Mac:
+    ./platform/k3s/up.sh        # extracts kubeconfig and merges into ~/.kube/config
+
+  Then:
+    kubectl config use-context lima-k3s-server
+    make bootstrap              # installs platform components onto k3s
