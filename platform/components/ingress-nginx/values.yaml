@@ -1,0 +1,37 @@
+# ingress-nginx Helm values.
+#
+# We bind directly to host ports 80/443 via hostPort. On Docker Desktop this
+# means localhost:80/443 (and the LAN IP, since DD forwards). On k3s-in-Lima
+# it means the Lima VM's host network, exposed on the Mac via vmnet.
+#
+# This avoids relying on a working LoadBalancer implementation, which differs
+# between DD and k3s.
+
+controller:
+  kind: Deployment
+  replicaCount: 1
+
+  hostPort:
+    enabled: true
+    ports:
+      http: 80
+      https: 443
+
+  service:
+    type: ClusterIP
+
+  ingressClassResource:
+    name: nginx
+    enabled: true
+    default: true
+  ingressClass: nginx
+  watchIngressWithoutClass: true
+
+  config:
+    use-forwarded-headers: "true"
+    proxy-body-size: "100m"
+    enable-real-ip: "true"
+
+  # Single-node cluster — don't fight ourselves on scheduling
+  tolerations:
+    - operator: Exists

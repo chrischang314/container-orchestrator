@@ -1,0 +1,31 @@
+# Keel Helm values.
+#
+# Keel watches Deployments annotated with keel.sh/* and triggers rolling
+# updates when image digests change in the registry. We rely on
+# per-deployment annotations to set the polling cadence (every 5 minutes),
+# so this file is intentionally minimal.
+
+helmProvider:
+  enabled: false
+
+service:
+  enabled: true
+  type: ClusterIP
+  externalPort: 9300
+
+basicauth:
+  enabled: false
+
+# Notifications can be wired up later (Slack, webhook, etc.)
+notifications:
+  enabled: false
+
+# Pull secrets are read from the target Deployments' imagePullSecrets,
+# so Keel uses the same ghcr-creds we configure for image pulls.
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 64Mi
+  limits:
+    memory: 128Mi

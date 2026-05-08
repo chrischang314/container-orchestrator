@@ -1,0 +1,25 @@
+# cert-manager Helm values.
+#
+# Installed but dormant. No ClusterIssuer is created until you opt in to
+# public TLS — at that point, drop a cluster-issuer.yaml in this directory
+# pointing at Let's Encrypt and re-run bootstrap.
+
+installCRDs: true
+
+# Modest resource footprint for a single Mac Mini
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+
+webhook:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+
+cainjector:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
