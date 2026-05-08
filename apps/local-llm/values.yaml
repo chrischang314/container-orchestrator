@@ -1,0 +1,74 @@
+# Deployment config for chrischang314/local-llm.
+#
+# Two services in-cluster (backend + frontend). Ollama runs on the Mac host
+# directly (Apple Metal acceleration), reachable from pods via
+# host.docker.internal:11434 on Docker Desktop, or host.lima.internal on k3s.
+
+namespace: default
+nameOverride: local-llm
+
+imagePullSecrets:
+  - name: ghcr-creds
+
+services:
+  - name: backend
+    image: ghcr.io/chrischang314/local-llm/backend
+    tag: main
+    port: 8000
+    replicas: 1
+
+    env:
+      # On Docker Desktop K8s. For k3s-in-Lima this becomes host.lima.internal.
+      - name: OLLAMA_URL
+        value: http://host.docker.internal:11434
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        memory: 512Mi
+
+    persistence:
+      - name: data
+        size: 1Gi
+        mountPath: /app/data
+
+    probes:
+      readiness:
+        httpGet:
+          path: /
+          port: 8000
+        initialDelaySeconds: 5
+        periodSeconds: 10
+
+  - name: frontend
+    image: ghcr.io/chrischang314/local-llm/frontend
+    tag: main
+    port: 80
+    replicas: 1
+
+    resources:
+      requests:
+        cpu: 25m
+        memory: 32Mi
+      limits:
+        memory: 128Mi
+
+    probes:
+      readiness:
+        httpGet:
+          path: /
+          port: 80
+        initialDelaySeconds: 3
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: local-llm.lan
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+          port: 80
