@@ -1,0 +1,100 @@
+# Pi-hole — network-wide DNS sinkhole.
+#
+# BEFORE DEPLOYING:
+#   1. Retrieve your current webpassword hash:
+#        docker exec pihole cat /etc/pihole/cli_pw
+#      Or set a new one — see migration notes below.
+#
+#   2. Create the K8s secret:
+#        kubectl create secret generic pihole-secret \
+#          --from-literal=webpassword='<your-password-plaintext>'
+#
+#   3. Stop the Docker container (brief DNS gap ~5s):
+#        docker stop pihole
+#
+#   4. Deploy:
+#        make deploy
+#
+# ROLLBACK: docker start pihole  (config data is shared, so nothing is lost)
+
+namespace: default
+nameOverride: pihole
+
+services:
+  - name: pihole
+    image: pihole/pihole
+    tag: latest
+    serviceName: pihole
+
+    # Port 80: web admin UI served directly via LoadBalancer.
+    # Pi-hole already owns port 80 on this host, so we keep it — ingress-nginx
+    # stays on 8080/8443 as before.
+    port: 80
+    serviceType: LoadBalancer
+
+    # DNS ports exposed alongside the web UI on the same LoadBalancer.
+    extraPorts:
+      - name: dns-tcp
+        port: 53
+        protocol: TCP
+      - name: dns-udp
+        port: 53
+        protocol: UDP
+
+    replicas: 1
+
+    # Official Docker Hub image; don't let Keel auto-update a live DNS server.
+    autoDeploy:
+      enabled: false
+
+    env:
+      - name: TZ
+        value: America/New_York
+      - name: WEBPASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: pihole-secret
+            key: webpassword
+
+    # NET_ADMIN is required for FTL and optional DHCP support.
+    securityContext:
+      capabilities:
+        add:
+          - NET_ADMIN
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 256Mi
+
+    probes:
+      readiness:
+        httpGet:
+          path: /admin/
+          port: 80
+        initialDelaySeconds: 20
+        periodSeconds: 10
+      liveness:
+        httpGet:
+          path: /admin/
+          port: 80
+        initialDelaySeconds: 30
+        periodSeconds: 30
+        failureThreshold: 3
+
+    # Re-use existing config data from the Docker-era bind mounts.
+    # hostPath mounts skip PVC creation and mount directly from the Mac host.
+    persistence:
+      - name: etc-pihole
+        mountPath: /etc/pihole
+        hostPath: /Users/chrischang/Projects/pihole/etc-pihole
+      - name: etc-dnsmasq
+        mountPath: /etc/dnsmasq.d
+        hostPath: /Users/chrischang/Projects/pihole/etc-dnsmasq.d
+
+# Pi-hole's web UI is on port 80 via the LoadBalancer above.
+# No ingress entry is needed (and would conflict with ingress-nginx on 8080).
+ingress:
+  enabled: false

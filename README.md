@@ -84,6 +84,50 @@ ci/templates/              drop-in GitHub Actions workflow for app repos
 scripts/                   deploy / status / switch-cluster
 ```
 
+## Migrating Pi-hole from Docker to Kubernetes
+
+Pi-hole runs as a K8s Deployment with a `LoadBalancer` service that holds ports
+53 (TCP + UDP), 80. Its config is mounted directly from the host paths that the
+previous Docker container used — no data migration needed.
+
+**One-time setup (run once before first deploy):**
+
+```sh
+# Create the secret from your existing Pi-hole password
+kubectl create secret generic pihole-secret \
+  --from-literal=webpassword='<your-password>'
+```
+
+If you don't know the plaintext password, set a new one — the container will
+write the new hash into `/Users/chrischang/Projects/pihole/etc-pihole` on
+startup.
+
+**Cutover (brief DNS gap ~5–10 s):**
+
+```sh
+docker stop pihole    # free port 53 on the host
+make deploy           # K8s LoadBalancer binds port 53
+# verify:
+dig @127.0.0.1 google.com
+```
+
+**Rollback if needed:**
+
+```sh
+helm uninstall pihole
+docker start pihole   # config data is unchanged — nothing is lost
+```
+
+**Notes:**
+
+- Keel auto-deploy is disabled for Pi-hole — it's an official image, not one
+  we control from GHCR. Update by changing `tag:` and running `make deploy`.
+- If you later want a `pihole.lan` hostname in the browser, add an Ingress
+  entry (port 80 to service `pihole`); the web UI is already on port 80 via
+  the LoadBalancer so it also works at `http://<mac-lan-ip>/admin`.
+- DHCP (port 67) is not exposed in K8s by default. If you use Pi-hole for DHCP,
+  add `- name: dhcp / port: 67 / protocol: UDP` to `extraPorts`.
+
 ## Auto-deploy flow
 
 1. Push to `main` in an app repo → GitHub Actions runs tests, builds a

@@ -30,6 +30,10 @@ spec:
       labels:
         {{- include "app.selectorLabels" (dict "root" $ "service" $svc) | nindent 8 }}
     spec:
+      {{- if $svc.hostNetwork }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      {{- end }}
       {{- with $.Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -44,11 +48,18 @@ spec:
           {{- if $svc.args }}
           args: {{ toYaml $svc.args | nindent 12 }}
           {{- end }}
-          {{- if $svc.port }}
+          {{- if or $svc.port $svc.extraPorts }}
           ports:
+            {{- if $svc.port }}
             - name: http
               containerPort: {{ $svc.port }}
               protocol: TCP
+            {{- end }}
+            {{- range $svc.extraPorts }}
+            - name: {{ .name }}
+              containerPort: {{ .port }}
+              protocol: {{ default "TCP" .protocol }}
+            {{- end }}
           {{- end }}
           {{- with $svc.env }}
           env:
@@ -60,6 +71,10 @@ spec:
           {{- end }}
           {{- with $svc.resources }}
           resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $svc.securityContext }}
+          securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           {{- with $svc.probes }}
@@ -90,8 +105,14 @@ spec:
       volumes:
         {{- range $svc.persistence }}
         - name: {{ .name }}
+          {{- if .hostPath }}
+          hostPath:
+            path: {{ .hostPath }}
+            type: DirectoryOrCreate
+          {{- else }}
           persistentVolumeClaim:
             claimName: {{ include "app.serviceFullname" (dict "root" $ "service" $svc) }}-{{ .name }}
+          {{- end }}
         {{- end }}
       {{- end }}
 {{- end }}

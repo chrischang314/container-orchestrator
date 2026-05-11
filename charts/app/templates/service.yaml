@@ -1,5 +1,5 @@
 {{- range $svc := .Values.services }}
-{{- if $svc.port }}
+{{- if or $svc.port $svc.extraPorts }}
 ---
 apiVersion: v1
 kind: Service
@@ -9,12 +9,20 @@ metadata:
   labels:
     {{- include "app.serviceLabels" (dict "root" $ "service" $svc) | nindent 4 }}
 spec:
-  type: ClusterIP
+  type: {{ default "ClusterIP" $svc.serviceType }}
   ports:
+    {{- if $svc.port }}
     - name: http
       port: {{ $svc.port }}
       targetPort: http
       protocol: TCP
+    {{- end }}
+    {{- range $svc.extraPorts }}
+    - name: {{ .name }}
+      port: {{ .port }}
+      targetPort: {{ .port }}
+      protocol: {{ default "TCP" .protocol }}
+    {{- end }}
   selector:
     {{- include "app.selectorLabels" (dict "root" $ "service" $svc) | nindent 4 }}
 {{- end }}

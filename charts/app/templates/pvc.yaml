@@ -1,5 +1,6 @@
 {{- range $svc := .Values.services }}
 {{- range $pvc := default (list) $svc.persistence }}
+{{- if not $pvc.hostPath }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -17,5 +18,6 @@ spec:
   {{- if $pvc.storageClassName }}
   storageClassName: {{ $pvc.storageClassName }}
   {{- end }}
+{{- end }}
 {{- end }}
 {{- end }}
