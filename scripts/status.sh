@@ -43,8 +43,12 @@ kubectl get deployments -A --no-headers 2>/dev/null \
     }'
 
 hdr "Ingress endpoints"
-kubectl get ingress -A -o json 2>/dev/null | python3 -c "
-import json, sys
+INGRESS_PORT=$(kubectl get svc -n ingress-nginx ingress-nginx-controller \
+  -o jsonpath='{.spec.ports[?(@.name=="http")].port}' 2>/dev/null || echo "80")
+kubectl get ingress -A -o json 2>/dev/null | INGRESS_PORT="$INGRESS_PORT" python3 -c "
+import json, os, sys
+port = os.environ.get('INGRESS_PORT', '80')
+suffix = '' if port in ('80', '') else f':{port}'
 data = json.load(sys.stdin)
 items = data.get('items', [])
 if not items:
@@ -56,7 +60,7 @@ for it in items:
         host = r.get('host', '*')
         for p in (r.get('http', {}) or {}).get('paths', []) or []:
             path = p.get('path', '/')
-            print(f'  http://{host}{path}   (ns={ns}, name={name})')
+            print(f'  http://{host}{suffix}{path}   (ns={ns}, name={name})')
 "
 
 hdr "Mac LAN IP"

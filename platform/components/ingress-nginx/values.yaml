@@ -1,24 +1,26 @@
 # ingress-nginx Helm values.
 #
-# We bind directly to host ports 80/443 via hostPort. On Docker Desktop this
-# means localhost:80/443 (and the LAN IP, since DD forwards). On k3s-in-Lima
-# it means the Lima VM's host network, exposed on the Mac via vmnet.
+# Exposed via Service type LoadBalancer:
+#   - Docker Desktop assigns "localhost" as the external IP and auto-forwards
+#     to the Mac (so http://localhost:<port> works).
+#   - k3s ships Klipper LB which assigns the node IP — works the same on
+#     k3s-in-Lima once vmnet networking is enabled.
 #
-# This avoids relying on a working LoadBalancer implementation, which differs
-# between DD and k3s.
+# Ports 80/443 on this Mac are taken by another service (Pi-hole), so we
+# expose ingress on 8080/8443. App URLs become http://<host>:8080.
 
 controller:
   kind: Deployment
   replicaCount: 1
 
-  hostPort:
-    enabled: true
-    ports:
-      http: 80
-      https: 443
-
   service:
-    type: ClusterIP
+    type: LoadBalancer
+    ports:
+      http: 8080
+      https: 8443
+    targetPorts:
+      http: http
+      https: https
 
   ingressClassResource:
     name: nginx

@@ -71,20 +71,20 @@ helm upgrade --install keel keel/keel \
   -f "$ROOT/platform/components/keel/values.yaml" \
   --wait --timeout 3m
 
-# 6. GHCR pull secret ------------------------------------------------------
-step "Ensuring GHCR image-pull secret in default namespace"
-if kubectl get secret ghcr-creds -n default >/dev/null 2>&1; then
-  echo "   ghcr-creds already exists; leaving as-is"
-  echo "   (re-run platform/components/ghcr-secret.sh to rotate)"
-else
-  "$ROOT/platform/components/ghcr-secret.sh"
-fi
-
-# 7. Summary ---------------------------------------------------------------
+# 6. Summary ---------------------------------------------------------------
 step "Bootstrap complete"
 kubectl get pods -A --no-headers 2>/dev/null \
   | awk '$4 != "Running" && $4 != "Completed" {print "   not ready: " $0}' \
   || true
+
+if ! kubectl get secret ghcr-creds -n default >/dev/null 2>&1; then
+  echo
+  echo "Note: no ghcr-creds secret exists in 'default' namespace."
+  echo "      Public GHCR packages don't need it. For private images, run:"
+  echo "        ./platform/components/ghcr-secret.sh"
+  echo "      and add 'imagePullSecrets: [{name: ghcr-creds}]' to your app's values.yaml."
+fi
+
 echo
 echo "Next:"
 echo "  make deploy      # apply all apps under apps/"

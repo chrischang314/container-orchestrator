@@ -44,7 +44,7 @@ for VALUES in "${APPS[@]}"; do
   echo
   echo "==> $APP_NAME  (namespace: $NS)"
   helm upgrade --install "$APP_NAME" "$ROOT/charts/app" \
-    -f "$VALUES" "${EXTRA[@]}" \
+    -f "$VALUES" "${EXTRA[@]+"${EXTRA[@]}"}" \
     --namespace "$NS" --create-namespace \
     --wait --timeout 5m
 done

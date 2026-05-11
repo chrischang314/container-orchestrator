@@ -49,9 +49,11 @@ make status        # show cluster + apps + ingress URLs
    the images.
 
 3. **Bootstrap the platform.** `make bootstrap` installs ingress-nginx,
-   cert-manager (dormant), and Keel, and prompts for a GHCR Personal
-   Access Token (`read:packages` scope) so the cluster can pull private
-   images. Keep the PAT — Keel uses the same secret to poll GHCR.
+   cert-manager (dormant), and Keel. If your GHCR packages are public, no
+   credentials needed. For private images, run
+   `./platform/components/ghcr-secret.sh` afterward (asks for a PAT with
+   `read:packages` scope) and uncomment `imagePullSecrets` in your app's
+   `values.yaml`.
 
 4. **Configure each app.** Add a directory under `apps/<name>/` with a
    `values.yaml` modeled on
@@ -62,7 +64,11 @@ make status        # show cluster + apps + ingress URLs
 
 6. **Make hostnames resolve.** Add ingress hosts to `/etc/hosts` on the
    Mac (`127.0.0.1`) and on any LAN device that should reach the apps
-   (the Mac's LAN IP).
+   (the Mac's LAN IP). Visit `http://<host>:8080` — the ingress is on
+   `8080/8443` by default to avoid port conflicts with other common Mac
+   services like Pi-hole; change in
+   [`platform/components/ingress-nginx/values.yaml`](platform/components/ingress-nginx/values.yaml)
+   to use the conventional `80/443`.
 
 ## Repo layout
 
