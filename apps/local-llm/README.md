@@ -34,7 +34,11 @@ reach the UI:
 192.168.x.y local-llm.lan          # on other devices on the LAN (Mac's IP)
 ```
 
-Then visit <http://local-llm.lan>.
+Then visit <http://local-llm.lan:8080>. (The platform exposes ingress on
+8080/8443 because ports 80/443 are commonly taken by other Mac services
+like Pi-hole — change in
+[`platform/components/ingress-nginx/values.yaml`](../../platform/components/ingress-nginx/values.yaml)
+if your machine has them free.)
 
 ## Auto-deploy
 

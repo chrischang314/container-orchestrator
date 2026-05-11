@@ -4,8 +4,10 @@
 namespace: default
 nameOverride: ""             # defaults to the helm release name
 
-imagePullSecrets:
-  - name: ghcr-creds
+# Empty by default — public GHCR images need no auth. For private packages,
+# add `- name: ghcr-creds` here (or override in apps/<name>/values.yaml) and
+# run platform/components/ghcr-secret.sh to create the secret.
+imagePullSecrets: []
 
 # List of services that make up this app. Each becomes one Deployment +
 # (optionally) one Service + one PVC per persistence entry.
@@ -16,6 +18,8 @@ services: []
 #     image: ghcr.io/chrischang314/local-llm/backend
 #     tag: main                   # poll target
 #     port: 8000                  # container port; omitted = no Service
+#     serviceName: backend        # optional: override the Service's DNS name
+#                                 # (default: <release>-<service>)
 #     replicas: 1
 #     autoDeploy:
 #       enabled: true

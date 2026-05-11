@@ -8,11 +8,11 @@ Services:
 
 Ingress hostnames (add these to /etc/hosts on any device that should reach the app):
 {{- range .Values.ingress.hosts }}
-  127.0.0.1  {{ .host }}    # → http://{{ .host }}{{ (first .paths).path }}
+  127.0.0.1  {{ .host }}    # then visit http://{{ .host }}:<ingress-port>{{ (first .paths).path }}
 {{- end }}
 
-To reach from other devices on the LAN, replace 127.0.0.1 with this Mac's
-LAN IP (e.g. `ipconfig getifaddr en0`).
+Run `make status` to see the active ingress port (default 8080). Replace
+127.0.0.1 with this Mac's LAN IP to reach from other devices.
 {{- end }}
 
 Auto-deploy: Keel polls GHCR every 5 minutes (per-deployment annotation).

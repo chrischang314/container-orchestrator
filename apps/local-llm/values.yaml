@@ -7,11 +7,16 @@
 namespace: default
 nameOverride: local-llm
 
-imagePullSecrets:
-  - name: ghcr-creds
+# local-llm's GHCR packages are public; no pull secret needed.
+# For private images, uncomment and run platform/components/ghcr-secret.sh:
+# imagePullSecrets:
+#   - name: ghcr-creds
 
 services:
   - name: backend
+    # The frontend's nginx.conf hardcodes `proxy_pass http://backend:8000`,
+    # so the Service must be reachable at exactly that hostname.
+    serviceName: backend
     image: ghcr.io/chrischang314/local-llm/backend
     tag: main
     port: 8000
@@ -36,8 +41,9 @@ services:
 
     probes:
       readiness:
+        # FastAPI has no `/` route; /openapi.json is always present and cheap.
         httpGet:
-          path: /
+          path: /openapi.json
           port: 8000
         initialDelaySeconds: 5
         periodSeconds: 10
