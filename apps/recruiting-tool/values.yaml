@@ -1,0 +1,167 @@
+# 1point3acres corpus — scraper + API + frontend.
+#
+# PRE-DEPLOY CHECKLIST:
+#   1. recruiting-db-secret must exist (created by postgres app bootstrap).
+#   2. ghcr-creds must exist: run platform/components/ghcr-secret.sh.
+#   3. Generate fresh storage state for the scraper:
+#        cd /Users/chrischang/Projects/recruiting-tool
+#        python scripts/login.py
+#      Then the file lands at data/storage_state.json (hostPath-mounted).
+#   4. Deploy postgres first so the DB is ready before migrations run:
+#        helm upgrade --install postgres charts/app -f apps/postgres/values.yaml
+
+namespace: default
+nameOverride: recruiting-tool
+
+imagePullSecrets:
+  - name: ghcr-creds
+
+services:
+  # ── API ────────────────────────────────────────────────────────────────────
+  - name: api
+    image: ghcr.io/chrischang314/recruiting-tool/api
+    tag: main
+    port: 8000
+    replicas: 1
+
+    env:
+      - name: DATABASE_URL
+        valueFrom:
+          secretKeyRef:
+            name: recruiting-db-secret
+            key: database-url
+      - name: EMBEDDER
+        value: bge-m3
+      - name: HF_HOME
+        value: /app/.hf-cache
+
+    resources:
+      requests:
+        cpu: 200m
+        memory: 1Gi
+      limits:
+        memory: 2Gi
+
+    probes:
+      readiness:
+        httpGet:
+          path: /healthz
+          port: 8000
+        # BGE-M3 model download on first start can take several minutes.
+        initialDelaySeconds: 120
+        periodSeconds: 15
+        failureThreshold: 20
+      liveness:
+        httpGet:
+          path: /healthz
+          port: 8000
+        initialDelaySeconds: 180
+        periodSeconds: 30
+
+    persistence:
+      - name: hf-cache
+        mountPath: /app/.hf-cache
+        hostPath: /Users/chrischang/Projects/recruiting-tool/data/hf-cache
+
+  # ── Scraper daemon ─────────────────────────────────────────────────────────
+  - name: scraper
+    image: ghcr.io/chrischang314/recruiting-tool/scraper
+    tag: main
+    # No port — daemon only, no HTTP surface.
+    replicas: 1
+    autoDeploy:
+      enabled: true
+
+    env:
+      - name: DATABASE_URL
+        valueFrom:
+          secretKeyRef:
+            name: recruiting-db-secret
+            key: database-url
+      - name: HF_HOME
+        value: /app/.hf-cache
+      - name: SCRAPER_HEADLESS
+        value: "true"
+      - name: SCRAPER_STORAGE_STATE_PATH
+        value: /app/data/storage_state.json
+      - name: SCRAPER_IMAGE_DIR
+        value: /app/data/images
+
+    resources:
+      requests:
+        cpu: 200m
+        memory: 2Gi
+      limits:
+        memory: 4Gi
+
+    persistence:
+      # data/ holds storage_state.json (1point3acres session) + scraped images.
+      - name: data
+        mountPath: /app/data
+        hostPath: /Users/chrischang/Projects/recruiting-tool/data
+      - name: hf-cache
+        mountPath: /app/.hf-cache
+        hostPath: /Users/chrischang/Projects/recruiting-tool/data/hf-cache
+
+  # ── Frontend ───────────────────────────────────────────────────────────────
+  - name: frontend
+    image: ghcr.io/chrischang314/recruiting-tool/frontend
+    tag: main
+    port: 3000
+    replicas: 1
+
+    env:
+      # Server-side Next.js → backend (in-cluster, no port exposure needed).
+      - name: API_URL
+        value: http://recruiting-tool-api:8000
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 512Mi
+
+    probes:
+      readiness:
+        httpGet:
+          path: /
+          port: 3000
+        initialDelaySeconds: 20
+        periodSeconds: 10
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: recruitingapp.lan
+      paths:
+        # API routes go to the backend; everything else to the Next.js frontend.
+        - path: /api
+          pathType: Prefix
+          service: api
+          port: 8000
+        - path: /healthz
+          pathType: Exact
+          service: api
+          port: 8000
+        - path: /stats
+          pathType: Prefix
+          service: api
+          port: 8000
+        - path: /companies
+          pathType: Prefix
+          service: api
+          port: 8000
+        - path: /posts
+          pathType: Prefix
+          service: api
+          port: 8000
+        - path: /search
+          pathType: Prefix
+          service: api
+          port: 8000
+        - path: /
+          pathType: Prefix
+          service: frontend
+          port: 3000

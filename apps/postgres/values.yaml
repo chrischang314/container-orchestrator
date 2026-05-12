@@ -1,0 +1,52 @@
+# PostgreSQL 16 + pgvector — shared database for the recruiting-tool app.
+namespace: default
+nameOverride: postgres
+
+services:
+  - name: postgres
+    image: pgvector/pgvector
+    tag: pg16
+    port: 5432
+    serviceName: postgres
+    autoDeploy:
+      enabled: false
+
+    env:
+      - name: POSTGRES_USER
+        value: recruiting
+      - name: POSTGRES_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: recruiting-db-secret
+            key: password
+      - name: POSTGRES_DB
+        value: recruiting
+      # Silence the "initdb: error: directory ... exists but is not empty" warning
+      # that fires on restart when the PVC already contains an initialized cluster.
+      - name: PGDATA
+        value: /var/lib/postgresql/data/pgdata
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 512Mi
+
+    probes:
+      readiness:
+        exec:
+          command: ["pg_isready", "-U", "recruiting", "-d", "recruiting"]
+        initialDelaySeconds: 10
+        periodSeconds: 5
+        failureThreshold: 12
+      liveness:
+        exec:
+          command: ["pg_isready", "-U", "recruiting", "-d", "recruiting"]
+        initialDelaySeconds: 30
+        periodSeconds: 15
+
+    persistence:
+      - name: pgdata
+        mountPath: /var/lib/postgresql/data
+        size: 10Gi
