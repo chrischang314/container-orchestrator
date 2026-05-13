@@ -3,12 +3,13 @@
 # PRE-DEPLOY CHECKLIST:
 #   1. recruiting-db-secret must exist (created by postgres app bootstrap).
 #   2. ghcr-creds must exist: run platform/components/ghcr-secret.sh.
-#   3. Generate fresh storage state for the scraper:
-#        cd /Users/chrischang/Projects/recruiting-tool
-#        python scripts/login.py
-#      Then the file lands at data/storage_state.json (hostPath-mounted).
-#   4. Deploy postgres first so the DB is ready before migrations run:
+#   3. Deploy postgres first so the DB is ready before migrations run:
 #        helm upgrade --install postgres charts/app -f apps/postgres/values.yaml
+#   4. Generate a 1point3acres session and copy it into the scraper pod
+#      (Docker Desktop K8s can't bind-mount macOS paths into pods):
+#        cd /Users/chrischang/Projects/recruiting-tool && python scripts/login.py
+#        POD=$(kubectl get pod -l app.kubernetes.io/component=scraper -o jsonpath='{.items[0].metadata.name}')
+#        kubectl cp data/storage_state.json $POD:/app/data/storage_state.json
 
 namespace: default
 nameOverride: recruiting-tool
@@ -19,7 +20,7 @@ imagePullSecrets:
 services:
   # ── API ────────────────────────────────────────────────────────────────────
   - name: api
-    image: ghcr.io/chrischang314/recruiting-tool/api
+    image: ghcr.io/chrischang314/recruiting-app/api
     tag: main
     port: 8000
     replicas: 1
@@ -38,9 +39,11 @@ services:
     resources:
       requests:
         cpu: 200m
-        memory: 1Gi
-      limits:
         memory: 2Gi
+      limits:
+        # BGE-M3 weights + tokenizer + inference state need >2Gi on the first
+        # query; OOMKilled at 2Gi when /search loads the model.
+        memory: 4Gi
 
     probes:
       readiness:
@@ -61,11 +64,11 @@ services:
     persistence:
       - name: hf-cache
         mountPath: /app/.hf-cache
-        hostPath: /Users/chrischang/Projects/recruiting-tool/data/hf-cache
+        size: 5Gi
 
   # ── Scraper daemon ─────────────────────────────────────────────────────────
   - name: scraper
-    image: ghcr.io/chrischang314/recruiting-tool/scraper
+    image: ghcr.io/chrischang314/recruiting-app/scraper
     tag: main
     # No port — daemon only, no HTTP surface.
     replicas: 1
@@ -96,16 +99,18 @@ services:
 
     persistence:
       # data/ holds storage_state.json (1point3acres session) + scraped images.
+      # Docker Desktop K8s can't bind-mount macOS paths, so we use PVCs and
+      # `kubectl cp` the storage_state.json into the pod after deploy.
       - name: data
         mountPath: /app/data
-        hostPath: /Users/chrischang/Projects/recruiting-tool/data
+        size: 5Gi
       - name: hf-cache
         mountPath: /app/.hf-cache
-        hostPath: /Users/chrischang/Projects/recruiting-tool/data/hf-cache
+        size: 5Gi
 
   # ── Frontend ───────────────────────────────────────────────────────────────
   - name: frontend
-    image: ghcr.io/chrischang314/recruiting-tool/frontend
+    image: ghcr.io/chrischang314/recruiting-app/frontend
     tag: main
     port: 3000
     replicas: 1
