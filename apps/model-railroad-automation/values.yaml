@@ -1,0 +1,54 @@
+# Model railroad browser control panel for the DCC-EX command station.
+namespace: default
+nameOverride: model-railroad-automation
+
+imagePullSecrets:
+  - name: ghcr-creds
+
+services:
+  - name: web-control
+    image: ghcr.io/chrischang314/model-railroad-automation/web-control
+    tag: main
+    serviceType: LoadBalancer
+    port: 15000
+    containerPort: 3000
+    replicas: 1
+    env:
+      - name: PORT
+        value: "3000"
+      - name: DCCEX_HOST
+        value: "192.168.4.22"
+      - name: DCCEX_PORT
+        value: "2560"
+      - name: DCCEX_MOCK
+        value: "false"
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        memory: 128Mi
+    probes:
+      readiness:
+        httpGet:
+          path: /health
+          port: 3000
+        initialDelaySeconds: 5
+        periodSeconds: 10
+      liveness:
+        httpGet:
+          path: /health
+          port: 3000
+        initialDelaySeconds: 20
+        periodSeconds: 20
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: modelrailroad.lan
+      paths:
+        - path: /
+          pathType: Prefix
+          service: web-control
+          port: 15000
