@@ -7,12 +7,12 @@
 #        helm upgrade --install postgres charts/app -f apps/postgres/values.yaml
 #   4. Generate a 1point3acres session and copy it into the scraper pod
 #      (Docker Desktop K8s can't bind-mount macOS paths into pods):
-#        cd /Users/chrischang/Projects/recruiting-tool && python scripts/login.py
+#        cd /Users/chrischang/Projects/recruiting-app && python scripts/login.py
 #        POD=$(kubectl get pod -l app.kubernetes.io/component=scraper -o jsonpath='{.items[0].metadata.name}')
 #        kubectl cp data/storage_state.json $POD:/app/data/storage_state.json
 
 namespace: default
-nameOverride: recruiting-tool
+nameOverride: recruiting-app
 
 imagePullSecrets:
   - name: ghcr-creds
@@ -33,6 +33,14 @@ services:
             key: database-url
       - name: EMBEDDER
         value: bge-m3
+      - name: TRANSLATION_OLLAMA_URL
+        value: http://host.docker.internal:11434
+      - name: TRANSLATION_MODEL
+        value: llama3.2:3b
+      - name: TRANSLATION_TIMEOUT_SECONDS
+        value: "90"
+      - name: TRANSLATION_MAX_CHARS
+        value: "6000"
       - name: HF_HOME
         value: /app/.hf-cache
 
@@ -87,8 +95,18 @@ services:
         value: "true"
       - name: SCRAPER_STORAGE_STATE_PATH
         value: /app/data/storage_state.json
+      - name: SCRAPER_USE_STORAGE_STATE
+        value: "false"
+      - name: SCRAPER_REQUIRE_STORAGE_STATE
+        value: "false"
       - name: SCRAPER_IMAGE_DIR
         value: /app/data/images
+      # Preview mode: crawl public post snippets before full auth works.
+      # Embedding/OCR can be enabled for the full-content re-scrape later.
+      - name: SCRAPER_ENABLE_EMBED
+        value: "false"
+      - name: SCRAPER_ENABLE_OCR
+        value: "false"
 
     resources:
       requests:
@@ -112,13 +130,15 @@ services:
   - name: frontend
     image: ghcr.io/chrischang314/recruiting-app/frontend
     tag: main
-    port: 3000
+    serviceType: LoadBalancer
+    port: 13000
+    containerPort: 3000
     replicas: 1
 
     env:
       # Server-side Next.js → backend (in-cluster, no port exposure needed).
       - name: API_URL
-        value: http://recruiting-tool-api:8000
+        value: http://recruiting-app-api:8000
 
     resources:
       requests:
@@ -169,4 +189,4 @@ ingress:
         - path: /
           pathType: Prefix
           service: frontend
-          port: 3000
+          port: 13000

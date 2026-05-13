@@ -1,4 +1,4 @@
-# PostgreSQL 16 + pgvector — shared database for the recruiting-tool app.
+# PostgreSQL 16 + pgvector — shared database for the recruiting-app.
 namespace: default
 nameOverride: postgres
 
