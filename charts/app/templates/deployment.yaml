@@ -41,7 +41,7 @@ spec:
       containers:
         - name: {{ $svc.name }}
           image: "{{ $svc.image }}:{{ default "main" $svc.tag }}"
-          imagePullPolicy: Always
+          imagePullPolicy: {{ default "Always" $svc.imagePullPolicy }}
           {{- if $svc.command }}
           command: {{ toYaml $svc.command | nindent 12 }}
           {{- end }}
@@ -52,7 +52,7 @@ spec:
           ports:
             {{- if $svc.port }}
             - name: http
-              containerPort: {{ $svc.port }}
+              containerPort: {{ default $svc.port $svc.containerPort }}
               protocol: TCP
             {{- end }}
             {{- range $svc.extraPorts }}

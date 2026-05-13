@@ -1,0 +1,84 @@
+# Model trading bot dashboard.
+namespace: default
+nameOverride: model-trading-bot
+
+imagePullSecrets:
+  - name: ghcr-creds
+
+services:
+  - name: backend
+    image: ghcr.io/chrischang314/model-trading-bot/backend
+    tag: main
+    port: 8000
+    replicas: 1
+    env:
+      - name: DEFAULT_SYMBOLS
+        value: AAPL,AMZN,META,NFLX,GOOGL
+      - name: DATA_PROVIDER
+        value: yfinance
+      - name: STORAGE_BACKEND
+        value: local
+      - name: LOCAL_DATA_DIR
+        value: /app/data
+      - name: BOOTSTRAP_ON_STARTUP
+        value: "true"
+      - name: AUTO_INGEST_ON_EMPTY
+        value: "true"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 1Gi
+    probes:
+      readiness:
+        httpGet:
+          path: /health
+          port: 8000
+        initialDelaySeconds: 10
+        periodSeconds: 10
+      liveness:
+        httpGet:
+          path: /health
+          port: 8000
+        initialDelaySeconds: 30
+        periodSeconds: 20
+    persistence:
+      - name: data
+        mountPath: /app/data
+        size: 2Gi
+
+  - name: frontend
+    image: ghcr.io/chrischang314/model-trading-bot/frontend
+    tag: main
+    serviceType: LoadBalancer
+    port: 14000
+    containerPort: 80
+    replicas: 1
+    env:
+      - name: BACKEND_HOST
+        value: model-trading-bot-backend
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        memory: 128Mi
+    probes:
+      readiness:
+        httpGet:
+          path: /
+          port: 80
+        initialDelaySeconds: 5
+        periodSeconds: 10
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: modeltradingbot.lan
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+          port: 14000
