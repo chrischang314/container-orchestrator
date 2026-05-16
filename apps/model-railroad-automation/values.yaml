@@ -48,7 +48,7 @@ ingress:
   enabled: true
   className: nginx
   hosts:
-    - host: modelrailroad.lan
+    - host: modelrailroadautomation.lan
       paths:
         - path: /
           pathType: Prefix

@@ -81,7 +81,7 @@ ingress:
   enabled: true
   className: nginx
   hosts:
-    - host: local-llm.lan
+    - host: localllm.lan
       paths:
         - path: /
           pathType: Prefix
