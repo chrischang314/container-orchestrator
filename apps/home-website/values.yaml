@@ -1,0 +1,63 @@
+# Chris Chang Projects dashboard.
+namespace: default
+nameOverride: home-website
+
+imagePullSecrets:
+  - name: ghcr-creds
+
+services:
+  - name: web
+    image: ghcr.io/chrischang314/home-website
+    tag: main
+    port: 16000
+    containerPort: 8080
+    replicas: 1
+    nodeSelector:
+      kubernetes.io/hostname: mac-mini-worker
+    env:
+      - name: SITE_AUDIENCE
+        value: home
+      - name: PORT
+        value: "8080"
+      - name: MODEL_RAILROAD_URL
+        value: "http://modelrailroadautomation.lan:8080/"
+      - name: TRADING_BOT_URL
+        value: "http://modeltradingbot.lan:8080/"
+      - name: LOCAL_LLM_URL
+        value: "http://localllm.lan:8080/"
+      - name: RECRUITING_APP_URL
+        value: "http://recruitingapp.lan:8080/"
+      - name: PIHOLE_URL
+        value: "http://192.168.4.56/admin/"
+      - name: HOMEBRIDGE_URL
+        value: "http://192.168.4.56:8581/"
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        memory: 128Mi
+    probes:
+      readiness:
+        httpGet:
+          path: /api/health
+          port: 8080
+        initialDelaySeconds: 5
+        periodSeconds: 10
+      liveness:
+        httpGet:
+          path: /api/health
+          port: 8080
+        initialDelaySeconds: 15
+        periodSeconds: 20
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: projects.lan
+      paths:
+        - path: /
+          pathType: Prefix
+          service: web
+          port: 16000
