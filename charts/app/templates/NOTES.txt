@@ -11,12 +11,12 @@ Ingress hostnames (add these to /etc/hosts on any device that should reach the a
   127.0.0.1  {{ .host }}    # then visit http://{{ .host }}:<ingress-port>{{ (first .paths).path }}
 {{- end }}
 
-Run `make status` to see the active ingress port (default 8080). Replace
-127.0.0.1 with this Mac's LAN IP to reach from other devices.
+Run `make status` to see the active ingress port and address. Replace
+127.0.0.1 with that ingress address to reach from other devices.
 {{- end }}
 
-Auto-deploy: Keel polls GHCR every 5 minutes (per-deployment annotation).
-On push of a new image with the tracked tag, the Deployment will roll over
-within ~5 minutes. Watch with:
+Auto-deploy: Keel polls the configured image registry when enabled on a
+Deployment. The poll interval is controlled by each service's autoDeploy
+configuration. Watch a rollout with:
 
   kubectl rollout status deployment/<service-name>

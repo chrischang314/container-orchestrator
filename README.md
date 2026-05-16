@@ -84,49 +84,59 @@ ci/templates/              drop-in GitHub Actions workflow for app repos
 scripts/                   deploy / status / switch-cluster
 ```
 
-## Migrating Pi-hole from Docker to Kubernetes
+## Pi-hole on the Raspberry Pi
 
-Pi-hole runs as a K8s Deployment with a `LoadBalancer` service that holds ports
-53 (TCP + UDP), 80. Its config is mounted directly from the host paths that the
-previous Docker container used — no data migration needed.
+Pi-hole runs as a K8s Deployment on the always-on Raspberry Pi with a
+`LoadBalancer` service that holds ports 53 (TCP + UDP) and 80. Its config is
+mounted from Pi host paths under `/srv/pihole`.
 
 **One-time setup (run once before first deploy):**
 
 ```sh
-# Create the secret from your existing Pi-hole password
 kubectl create secret generic pihole-secret \
   --from-literal=webpassword='<your-password>'
+
+ssh chrischang@192.168.4.56 'sudo mkdir -p /srv/pihole/etc-pihole /srv/pihole/etc-dnsmasq.d && sudo chown -R 1000:1000 /srv/pihole'
+rsync -av /Users/chrischang/Projects/pihole/etc-pihole/ chrischang@192.168.4.56:/srv/pihole/etc-pihole/
+rsync -av /Users/chrischang/Projects/pihole/etc-dnsmasq.d/ chrischang@192.168.4.56:/srv/pihole/etc-dnsmasq.d/
 ```
 
-If you don't know the plaintext password, set a new one — the container will
-write the new hash into `/Users/chrischang/Projects/pihole/etc-pihole` on
-startup.
-
-**Cutover (brief DNS gap ~5–10 s):**
+**Deploy:**
 
 ```sh
-docker stop pihole    # free port 53 on the host
-make deploy           # K8s LoadBalancer binds port 53
-# verify:
-dig @127.0.0.1 google.com
+kubectl config use-context rpi5-k3s
+helm upgrade --install pihole charts/app -f apps/pihole/values.yaml \
+  --namespace default --create-namespace --wait
+dig @192.168.4.56 google.com
 ```
 
-**Rollback if needed:**
-
-```sh
-helm uninstall pihole
-docker start pihole   # config data is unchanged — nothing is lost
-```
+After verification, point the router's DNS/DHCP settings at `192.168.4.56`.
 
 **Notes:**
 
-- Keel auto-deploy is disabled for Pi-hole — it's an official image, not one
-  we control from GHCR. Update by changing `tag:` and running `make deploy`.
+- Keel polls `pihole/pihole:latest` daily and recreates the pod when the digest
+  changes.
 - If you later want a `pihole.lan` hostname in the browser, add an Ingress
   entry (port 80 to service `pihole`); the web UI is already on port 80 via
-  the LoadBalancer so it also works at `http://<mac-lan-ip>/admin`.
+  the LoadBalancer so it also works at `http://192.168.4.56/admin`.
 - DHCP (port 67) is not exposed in K8s by default. If you use Pi-hole for DHCP,
   add `- name: dhcp / port: 67 / protocol: UDP` to `extraPorts`.
+
+## Homebridge on the Raspberry Pi
+
+Homebridge runs on the Raspberry Pi host network for HomeKit/mDNS reliability.
+Its seed config lives in the private `chrischang314/homebridge` repo and is
+copied to `/srv/homebridge` before the first deploy.
+
+```sh
+kubectl config use-context rpi5-k3s
+helm upgrade --install homebridge charts/app -f apps/homebridge/values.yaml \
+  --namespace default --create-namespace --wait
+```
+
+Homebridge UI is available at `http://192.168.4.56:8581`. Keel polls
+`homebridge/homebridge:latest` daily and recreates the pod when the digest
+changes.
 
 ## Auto-deploy flow
 

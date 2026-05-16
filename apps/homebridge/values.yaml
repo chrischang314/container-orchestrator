@@ -1,0 +1,72 @@
+# Homebridge — Apple HomeKit bridge on the always-on Raspberry Pi.
+#
+# Runtime data lives on the Pi at /srv/homebridge. The seed configuration is
+# tracked in the private chrischang314/homebridge repo and copied there before
+# the first deploy.
+
+namespace: default
+nameOverride: homebridge
+
+services:
+  - name: homebridge
+    image: homebridge/homebridge
+    tag: latest
+    replicas: 1
+
+    # HomeKit pairing and accessory discovery rely on LAN multicast/mDNS, so
+    # Homebridge needs the Pi's host network rather than normal pod networking.
+    hostNetwork: true
+    strategy:
+      type: Recreate
+    nodeSelector:
+      kubernetes.io/hostname: rpi5-control
+
+    # Keel polls Docker Hub and recreates the pod when :latest changes.
+    autoDeploy:
+      enabled: true
+      pollSchedule: "@every 24h"
+
+    env:
+      - name: TZ
+        value: America/New_York
+      - name: PUID
+        value: "1000"
+      - name: PGID
+        value: "1000"
+      - name: HOMEBRIDGE_CONFIG_UI
+        value: "1"
+      - name: HOMEBRIDGE_CONFIG_UI_PORT
+        value: "8581"
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 768Mi
+
+    probes:
+      readiness:
+        httpGet:
+          path: /
+          port: 8581
+        initialDelaySeconds: 45
+        periodSeconds: 10
+        failureThreshold: 12
+      liveness:
+        httpGet:
+          path: /
+          port: 8581
+        initialDelaySeconds: 120
+        periodSeconds: 30
+        failureThreshold: 3
+
+    persistence:
+      - name: config
+        mountPath: /homebridge
+        hostPath: /srv/homebridge
+
+# Homebridge is served directly on the Pi host network:
+#   http://192.168.4.56:8581
+ingress:
+  enabled: false

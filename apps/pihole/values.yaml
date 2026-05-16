@@ -1,21 +1,18 @@
-# Pi-hole — network-wide DNS sinkhole.
+# Pi-hole — network-wide DNS sinkhole on the always-on Raspberry Pi.
 #
 # BEFORE DEPLOYING:
-#   1. Retrieve your current webpassword hash:
-#        docker exec pihole cat /etc/pihole/cli_pw
-#      Or set a new one — see migration notes below.
-#
-#   2. Create the K8s secret:
+#   1. Create or copy the K8s secret:
 #        kubectl create secret generic pihole-secret \
 #          --from-literal=webpassword='<your-password-plaintext>'
 #
-#   3. Stop the Docker container (brief DNS gap ~5s):
-#        docker stop pihole
+#   2. Copy Pi-hole data to the Pi host:
+#        rsync -av /Users/chrischang/Projects/pihole/etc-pihole/ \
+#          chrischang@192.168.4.56:/srv/pihole/etc-pihole/
+#        rsync -av /Users/chrischang/Projects/pihole/etc-dnsmasq.d/ \
+#          chrischang@192.168.4.56:/srv/pihole/etc-dnsmasq.d/
 #
-#   4. Deploy:
-#        make deploy
-#
-# ROLLBACK: docker start pihole  (config data is shared, so nothing is lost)
+#   3. Deploy to the rpi5-k3s context, then update the router DNS target to
+#      192.168.4.56 after verification.
 
 namespace: default
 nameOverride: pihole
@@ -42,19 +39,26 @@ services:
         protocol: UDP
 
     replicas: 1
+    strategy:
+      type: Recreate
+    nodeSelector:
+      kubernetes.io/hostname: rpi5-control
 
-    # Official Docker Hub image; don't let Keel auto-update a live DNS server.
+    # Keel polls Docker Hub and recreates the pod when :latest changes.
     autoDeploy:
-      enabled: false
+      enabled: true
+      pollSchedule: "@every 24h"
 
     env:
       - name: TZ
         value: America/New_York
-      - name: WEBPASSWORD
+      - name: FTLCONF_webserver_api_password
         valueFrom:
           secretKeyRef:
             name: pihole-secret
             key: webpassword
+      - name: FTLCONF_dns_listeningMode
+        value: all
 
     # NET_ADMIN is required for FTL and optional DHCP support.
     securityContext:
@@ -84,15 +88,15 @@ services:
         periodSeconds: 30
         failureThreshold: 3
 
-    # Re-use existing config data from the Docker-era bind mounts.
-    # hostPath mounts skip PVC creation and mount directly from the Mac host.
+    # Re-use migrated config data on the always-on Raspberry Pi host.
+    # hostPath mounts skip PVC creation and mount directly from the Pi.
     persistence:
       - name: etc-pihole
         mountPath: /etc/pihole
-        hostPath: /Users/chrischang/Projects/pihole/etc-pihole
+        hostPath: /srv/pihole/etc-pihole
       - name: etc-dnsmasq
         mountPath: /etc/dnsmasq.d
-        hostPath: /Users/chrischang/Projects/pihole/etc-dnsmasq.d
+        hostPath: /srv/pihole/etc-dnsmasq.d
 
 # Pi-hole's web UI is on port 80 via the LoadBalancer above.
 # No ingress entry is needed (and would conflict with ingress-nginx on 8080).

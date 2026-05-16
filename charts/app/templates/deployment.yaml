@@ -17,11 +17,16 @@ metadata:
     {{- end }}
 spec:
   replicas: {{ default 1 $svc.replicas }}
+  {{- if $svc.strategy }}
+  strategy:
+    {{- toYaml $svc.strategy | nindent 4 }}
+  {{- else }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 0
       maxSurge: 1
+  {{- end }}
   selector:
     matchLabels:
       {{- include "app.selectorLabels" (dict "root" $ "service" $svc) | nindent 6 }}
@@ -36,6 +41,18 @@ spec:
       {{- end }}
       {{- with $.Values.imagePullSecrets }}
       imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $svc.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $svc.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $svc.tolerations }}
+      tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       containers:
