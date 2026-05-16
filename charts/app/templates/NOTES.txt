@@ -8,11 +8,11 @@ Services:
 
 Ingress hostnames (add these to /etc/hosts on any device that should reach the app):
 {{- range .Values.ingress.hosts }}
-  127.0.0.1  {{ .host }}    # then visit http://{{ .host }}:<ingress-port>{{ (first .paths).path }}
+  127.0.0.1  {{ .host }}    # then visit http://{{ .host }}{{ (first .paths).path }}
 {{- end }}
 
-Run `make status` to see the active ingress port and address. Replace
-127.0.0.1 with that ingress address to reach from other devices.
+Run `make status` to see the active ingress address. Replace 127.0.0.1 with
+that ingress address to reach from other devices.
 {{- end }}
 
 Auto-deploy: Keel polls the configured image registry when enabled on a

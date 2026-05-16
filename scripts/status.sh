@@ -64,16 +64,13 @@ for it in items:
 "
 
 hdr "Ingress address"
-INGRESS_ADDR="$(kubectl get svc -n ingress-nginx ingress-nginx-controller \
-  -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"
-if [[ -z "$INGRESS_ADDR" ]]; then
-  INGRESS_ADDR="$(kubectl get svc -n ingress-nginx ingress-nginx-controller \
-    -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)"
+INGRESS_ADDRS="$(kubectl get svc -n ingress-nginx ingress-nginx-controller \
+  -o jsonpath='{range .status.loadBalancer.ingress[*]}{.ip}{.hostname}{" "}{end}' 2>/dev/null | xargs || true)"
+if [[ -z "$INGRESS_ADDRS" ]]; then
+  INGRESS_ADDRS="$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true)"
 fi
-if [[ -z "$INGRESS_ADDR" ]]; then
-  INGRESS_ADDR="$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true)"
-fi
-echo "  ${INGRESS_ADDR:-(no ingress address detected)}"
+echo "  ${INGRESS_ADDRS:-(no ingress address detected)}"
 echo
 echo "  Add to /etc/hosts on other devices to reach ingress hosts:"
-echo "    ${INGRESS_ADDR:-<ingress-address>}   <ingress-host>"
+FIRST_INGRESS_ADDR="${INGRESS_ADDRS%% *}"
+echo "    ${FIRST_INGRESS_ADDR:-<ingress-address>}   <ingress-host>"
