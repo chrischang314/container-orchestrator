@@ -2,7 +2,7 @@
 #
 # Two services in-cluster (backend + frontend). Ollama runs on the Mac host
 # directly (Apple Metal acceleration), reachable from pods via
-# host.docker.internal:11434 on Docker Desktop, or host.lima.internal on k3s.
+# host.lima.internal:11434 through the Mac Mini Lima worker.
 
 namespace: default
 nameOverride: local-llm
@@ -21,11 +21,16 @@ services:
     tag: main
     port: 8000
     replicas: 1
+    nodeSelector:
+      kubernetes.io/hostname: mac-mini-worker
+    hostAliases:
+      - ip: 192.168.5.2
+        hostnames:
+          - host.lima.internal
 
     env:
-      # On Docker Desktop K8s. For k3s-in-Lima this becomes host.lima.internal.
       - name: OLLAMA_URL
-        value: http://host.docker.internal:11434
+        value: http://host.lima.internal:11434
 
     resources:
       requests:
@@ -51,8 +56,12 @@ services:
   - name: frontend
     image: ghcr.io/chrischang314/local-llm/frontend
     tag: main
-    port: 80
+    serviceType: LoadBalancer
+    port: 12000
+    containerPort: 80
     replicas: 1
+    nodeSelector:
+      kubernetes.io/hostname: mac-mini-worker
 
     resources:
       requests:
@@ -77,4 +86,4 @@ ingress:
         - path: /
           pathType: Prefix
           service: frontend
-          port: 80
+          port: 12000

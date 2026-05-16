@@ -13,6 +13,8 @@ services:
     port: 15000
     containerPort: 3000
     replicas: 1
+    nodeSelector:
+      kubernetes.io/hostname: railroad-pi3
     env:
       - name: PORT
         value: "3000"

@@ -24,6 +24,8 @@ services:
     tag: main
     port: 8000
     replicas: 1
+    nodeSelector:
+      kubernetes.io/hostname: mac-mini-worker
 
     env:
       - name: DATABASE_URL
@@ -34,7 +36,7 @@ services:
       - name: EMBEDDER
         value: bge-m3
       - name: TRANSLATION_OLLAMA_URL
-        value: http://host.docker.internal:11434
+        value: http://host.lima.internal:11434
       - name: TRANSLATION_MODEL
         value: llama3.2:3b
       - name: TRANSLATION_TIMEOUT_SECONDS
@@ -43,6 +45,11 @@ services:
         value: "6000"
       - name: HF_HOME
         value: /app/.hf-cache
+
+    hostAliases:
+      - ip: 192.168.5.2
+        hostnames:
+          - host.lima.internal
 
     resources:
       requests:
@@ -80,6 +87,8 @@ services:
     tag: main
     # No port — daemon only, no HTTP surface.
     replicas: 1
+    nodeSelector:
+      kubernetes.io/hostname: mac-mini-worker
     autoDeploy:
       enabled: true
 
@@ -134,6 +143,8 @@ services:
     port: 13000
     containerPort: 3000
     replicas: 1
+    nodeSelector:
+      kubernetes.io/hostname: mac-mini-worker
 
     env:
       # Server-side Next.js → backend (in-cluster, no port exposure needed).

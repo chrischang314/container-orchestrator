@@ -8,6 +8,8 @@ services:
     tag: pg16
     port: 5432
     serviceName: postgres
+    nodeSelector:
+      kubernetes.io/hostname: mac-mini-worker
     autoDeploy:
       enabled: false
 

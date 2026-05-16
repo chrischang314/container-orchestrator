@@ -11,6 +11,8 @@ services:
     tag: main
     port: 8000
     replicas: 1
+    nodeSelector:
+      kubernetes.io/hostname: mac-mini-worker
     env:
       - name: DEFAULT_SYMBOLS
         value: AAPL,AMZN,META,NFLX,GOOGL
@@ -55,6 +57,8 @@ services:
     port: 14000
     containerPort: 80
     replicas: 1
+    nodeSelector:
+      kubernetes.io/hostname: mac-mini-worker
     env:
       - name: BACKEND_HOST
         value: model-trading-bot-backend

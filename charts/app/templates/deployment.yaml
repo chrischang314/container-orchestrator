@@ -55,6 +55,10 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- with $svc.hostAliases }}
+      hostAliases:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ $svc.name }}
           image: "{{ $svc.image }}:{{ default "main" $svc.tag }}"
