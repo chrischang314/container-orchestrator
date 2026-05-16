@@ -10,7 +10,7 @@ same Mac Mini / Raspberry Pi / Synology homelab.
 - Control plane: `rpi5-control` at `192.168.4.56`
 - Mac Mini worker: `mac-mini-worker` at `192.168.4.34`
 - Railroad edge worker: `railroad-pi3` at `192.168.4.57`
-- Synology NAS candidate: `Synology.local` at `192.168.4.33`
+- Synology NAS storage candidate: `Synology.local` at `192.168.4.33`
 
 Node labels:
 
@@ -19,6 +19,11 @@ Node labels:
 | `rpi5-control` | K3s control plane and always-on home infra | `workload-tier=home-infra`, `hardware=raspberry-pi` |
 | `mac-mini-worker` | Main compute and web app worker | `workload-tier=compute`, `hardware=mac-mini` |
 | `railroad-pi3` | Train-control edge worker | `workload-tier=edge`, `hardware=raspberry-pi`, `railroad-csb1-updater=true` |
+
+The three active Kubernetes nodes are also labeled
+`svccontroller.k3s.cattle.io/enablelb=true`. This puts K3s ServiceLB in
+allow-list mode so a future NAS/storage node does not try to host LoadBalancer
+pods or bind ports already owned by DSM.
 
 Do not commit or print the K3s node token. If it is needed, read it on the
 control plane from `/var/lib/rancher/k3s/server/node-token` over SSH.
@@ -129,31 +134,42 @@ copy. For app caches, decide whether they can be rebuilt before migrating.
 
 ## Synology Worker Status
 
-The NAS is reachable at `192.168.4.33` and answers on DSM/SMB ports:
+The NAS is reachable at `192.168.4.33`, SSH is enabled, and the DSM admin user
+can run sudo. Hardware and OS:
 
-- `80`
-- `443`
-- `5000`
-- `5001`
-- `445`
-- `139`
+- Model family observed by the kernel: `synology_geminilakenk_ds225+`
+- OS: DSM 7.3.2
+- Architecture: `x86_64`
+- LAN interface: `eth0` at `192.168.4.33`
 
-SSH on `22` is currently refused, so the NAS cannot be joined to K3s from this
-machine yet. Before migration:
+Direct K3s worker attempt result:
 
-1. Enable SSH in DSM: Control Panel -> Terminal & SNMP -> Enable SSH.
-2. Confirm the DSM user has sudo/admin rights.
-3. Confirm CPU architecture and whether DSM's Container Manager is installed.
-4. Run the K3s agent installer using the `rpi5-control` server URL and node
-   token.
-5. Label the node, for example:
+- K3s agent install succeeded and was able to reach `rpi5-control`.
+- containerd started under `/volume1/k3s`.
+- kubelet failed before registering the node because `/proc/cgroups` has no
+  `pids` controller.
+- Tried `pod-max-pids=-1`, `cgroups-per-qos=false`,
+  `enforce-node-allocatable=`, and old PID feature gates; K3s still failed at
+  its default kubelet config preflight with `pids cgroup controller not found`.
+- The failed K3s install was cleaned up, including the token-bearing systemd
+  env file and `/volume1/k3s`.
 
-```sh
-kubectl label node <synology-node-name> workload-tier=storage hardware=synology
-```
+Do not retry a direct DSM-hosted K3s worker unless Synology ships a kernel with
+`CONFIG_CGROUP_PIDS`, or unless the worker runs inside a real Linux VM on the
+NAS. Containers on DSM share the DSM kernel, so a containerized K3s worker would
+hit the same cgroup limit.
 
-Recommended first migration target after the Synology joins: `postgres`.
-Storage-adjacent caches can move later if the NAS proves reliable and performant.
+The practical storage path is NFS:
+
+1. Enable NFS service in DSM.
+2. Create a shared folder for Kubernetes volumes, for example `k8s`.
+3. Export it to the LAN or at least the active K3s node IPs.
+4. Install an NFS-backed StorageClass in this cluster.
+5. Migrate PostgreSQL by dump/restore into a new PVC on that StorageClass.
+
+Recommended first migration target after NFS is available: `postgres`.
+Storage-adjacent caches can move later if the NAS proves reliable and
+performant.
 
 ## Learned Nuances
 
@@ -172,6 +188,8 @@ Storage-adjacent caches can move later if the NAS proves reliable and performant
 - Homebridge uses host networking because HomeKit discovery depends on LAN
   multicast/mDNS.
 - Railroad control is intentionally placed on the Pi near the train hardware.
+- Synology DSM 7.3.2 on this DS225+ cannot run a direct K3s worker because its
+  kernel lacks the `pids` cgroup controller.
 - Do not commit kubeconfigs, K3s tokens, Pi-hole passwords, NAS credentials, or
   Homebridge pairing secrets.
 
