@@ -20,17 +20,17 @@ services:
       - name: PORT
         value: "8080"
       - name: MODEL_RAILROAD_URL
-        value: "http://modelrailroadautomation.lan:8080/"
+        value: "http://modelrailroadautomation.lan/"
       - name: TRADING_BOT_URL
-        value: "http://modeltradingbot.lan:8080/"
+        value: "http://modeltradingbot.lan/"
       - name: LOCAL_LLM_URL
-        value: "http://localllm.lan:8080/"
+        value: "http://localllm.lan/"
       - name: RECRUITING_APP_URL
-        value: "http://recruitingapp.lan:8080/"
+        value: "http://recruitingapp.lan/"
       - name: PIHOLE_URL
-        value: "http://192.168.4.56/admin/"
+        value: "http://pihole.lan/admin/"
       - name: HOMEBRIDGE_URL
-        value: "http://192.168.4.56:8581/"
+        value: "http://homebridge.lan/"
     resources:
       requests:
         cpu: 25m
