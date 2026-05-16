@@ -48,6 +48,18 @@ services: []
 #         accessMode: ReadWriteOnce   # default
 #         # storageClassName: local-path   # omit to use the cluster's default
 
+# Optional additional Services that point at an existing component Deployment.
+# Useful when one pod needs separate Service types, such as a DNS LoadBalancer
+# plus an internal web Service.
+extraServices: []
+# - name: web
+#   component: pihole          # defaults to name; selector component to target
+#   serviceType: ClusterIP
+#   ports:
+#     - name: http
+#       port: 80
+#       targetPort: 80
+
 ingress:
   enabled: false
   className: nginx

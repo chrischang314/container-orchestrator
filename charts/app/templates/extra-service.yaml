@@ -1,0 +1,21 @@
+{{- range $svc := .Values.extraServices }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $svc.serviceName | default (include "app.serviceFullname" (dict "root" $ "service" $svc)) }}
+  namespace: {{ $.Values.namespace | default "default" }}
+  labels:
+    {{- include "app.serviceLabels" (dict "root" $ "service" $svc) | nindent 4 }}
+spec:
+  type: {{ default "ClusterIP" $svc.serviceType }}
+  ports:
+    {{- range $svc.ports }}
+    - name: {{ .name }}
+      port: {{ .port }}
+      targetPort: {{ default .port .targetPort }}
+      protocol: {{ default "TCP" .protocol }}
+    {{- end }}
+  selector:
+    {{- include "app.selectorLabels" (dict "root" $ "service" (dict "name" (default $svc.name $svc.component))) | nindent 4 }}
+{{- end }}

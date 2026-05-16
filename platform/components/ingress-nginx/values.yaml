@@ -6,8 +6,8 @@
 #   - k3s ships Klipper LB which assigns the node IP — works the same on
 #     k3s-in-Lima once vmnet networking is enabled.
 #
-# Ports 80/443 on this Mac are taken by another service (Pi-hole), so we
-# expose ingress on 8080/8443. App URLs become http://<host>:8080.
+# Ingress owns normal web ports. Pi-hole DNS still owns port 53; Pi-hole's web
+# UI is routed by hostname through ingress like the rest of the apps.
 
 controller:
   kind: Deployment
@@ -16,8 +16,8 @@ controller:
   service:
     type: LoadBalancer
     ports:
-      http: 8080
-      https: 8443
+      http: 80
+      https: 443
     targetPorts:
       http: http
       https: https

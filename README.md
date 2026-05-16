@@ -20,14 +20,14 @@ Switching is a `kubectl config use-context` away.
 
 | Backend | Status | When to use |
 |---|---|---|
-| **Docker Desktop K8s** | active | Single Mac Mini, simplest setup |
-| **k3s in Lima** | scaffolded, dormant | Once you add a second Mac Mini |
+| **Docker Desktop K8s** | legacy | Original single-node setup; useful as a rollback reference |
+| **k3s** | active | Raspberry Pi control plane plus Mac Mini / Pi workers |
 
 The platform components (ingress-nginx, cert-manager, Keel) and all app
 manifests are deliberately distro-agnostic — PVCs use the cluster's default
-StorageClass, ingress is a controller we install ourselves, no LoadBalancer
-services. See [`platform/k3s/MIGRATION.md`](platform/k3s/MIGRATION.md) for the
-switch-over procedure.
+StorageClass and ingress is a controller we install ourselves. See
+[`platform/k3s/MIGRATION.md`](platform/k3s/MIGRATION.md) for the switch-over
+procedure.
 
 ## Quick start
 
@@ -62,13 +62,10 @@ make status        # show cluster + apps + ingress URLs
 5. **Deploy.** `make deploy` runs `helm upgrade --install` for every app.
    `make status` prints the ingress hostnames and the Mac's LAN IP.
 
-6. **Make hostnames resolve.** Add ingress hosts to `/etc/hosts` on the
-   Mac (`127.0.0.1`) and on any LAN device that should reach the apps
-   (the Mac's LAN IP). Visit `http://<host>:8080` — the ingress is on
-   `8080/8443` by default to avoid port conflicts with other common Mac
-   services like Pi-hole; change in
-   [`platform/components/ingress-nginx/values.yaml`](platform/components/ingress-nginx/values.yaml)
-   to use the conventional `80/443`.
+6. **Make hostnames resolve.** Pi-hole serves the LAN DNS records for app
+   hostnames like `recruitingapp.lan` and `modeltradingbot.lan`. Visit
+   `http://<host>` with no port number; ingress-nginx owns the normal web
+   ports `80/443`.
 
 ## Repo layout
 
@@ -87,8 +84,9 @@ scripts/                   deploy / status / switch-cluster
 ## Pi-hole on the Raspberry Pi
 
 Pi-hole runs as a K8s Deployment on the always-on Raspberry Pi with a
-`LoadBalancer` service that holds ports 53 (TCP + UDP) and 80. Its config is
-mounted from Pi host paths under `/srv/pihole`.
+`LoadBalancer` service that holds port 53 (TCP + UDP) for DNS. Its web UI is
+routed through ingress at `http://pihole.lan/`. Config is mounted from Pi host
+paths under `/srv/pihole`.
 
 **One-time setup (run once before first deploy):**
 
@@ -116,9 +114,8 @@ After verification, point the router's DNS/DHCP settings at `192.168.4.56`.
 
 - Keel polls `pihole/pihole:latest` daily and recreates the pod when the digest
   changes.
-- If you later want a `pihole.lan` hostname in the browser, add an Ingress
-  entry (port 80 to service `pihole`); the web UI is already on port 80 via
-  the LoadBalancer so it also works at `http://192.168.4.56/admin`.
+- Pi-hole custom DNS records map the project hostnames to the cluster ingress
+  address, so app URLs do not need port numbers.
 - DHCP (port 67) is not exposed in K8s by default. If you use Pi-hole for DHCP,
   add `- name: dhcp / port: 67 / protocol: UDP` to `extraPorts`.
 
@@ -134,7 +131,7 @@ helm upgrade --install homebridge charts/app -f apps/homebridge/values.yaml \
   --namespace default --create-namespace --wait
 ```
 
-Homebridge UI is available at `http://192.168.4.56:8581`. Keel polls
+Homebridge UI is available at `http://homebridge.lan`. Keel polls
 `homebridge/homebridge:latest` daily and recreates the pod when the digest
 changes.
 

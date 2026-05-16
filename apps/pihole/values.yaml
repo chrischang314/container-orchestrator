@@ -23,13 +23,12 @@ services:
     tag: latest
     serviceName: pihole
 
-    # Port 80: web admin UI served directly via LoadBalancer.
-    # Pi-hole already owns port 80 on this host, so we keep it — ingress-nginx
-    # stays on 8080/8443 as before.
-    port: 80
+    # DNS is exposed directly on the LAN. The web UI is exposed separately
+    # through ingress as http://pihole.lan/admin/ so app hostnames can share
+    # normal HTTP port 80.
     serviceType: LoadBalancer
 
-    # DNS ports exposed alongside the web UI on the same LoadBalancer.
+    # DNS ports exposed on the LoadBalancer.
     extraPorts:
       - name: dns-tcp
         port: 53
@@ -98,7 +97,23 @@ services:
         mountPath: /etc/dnsmasq.d
         hostPath: /srv/pihole/etc-dnsmasq.d
 
-# Pi-hole's web UI is on port 80 via the LoadBalancer above.
-# No ingress entry is needed (and would conflict with ingress-nginx on 8080).
+extraServices:
+  - name: web
+    component: pihole
+    ports:
+      - name: http
+        port: 80
+        targetPort: 80
+
 ingress:
-  enabled: false
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/app-root: /admin/
+  hosts:
+    - host: pihole.lan
+      paths:
+        - path: /
+          pathType: Prefix
+          service: web
+          port: 80

@@ -12,6 +12,7 @@ services:
     image: homebridge/homebridge
     tag: latest
     replicas: 1
+    port: 8581
 
     # HomeKit pairing and accessory discovery rely on LAN multicast/mDNS, so
     # Homebridge needs the Pi's host network rather than normal pod networking.
@@ -66,7 +67,13 @@ services:
         mountPath: /homebridge
         hostPath: /srv/homebridge
 
-# Homebridge is served directly on the Pi host network:
-#   http://192.168.4.56:8581
 ingress:
-  enabled: false
+  enabled: true
+  className: nginx
+  hosts:
+    - host: homebridge.lan
+      paths:
+        - path: /
+          pathType: Prefix
+          service: homebridge
+          port: 8581

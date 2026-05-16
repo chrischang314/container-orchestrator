@@ -26,19 +26,15 @@ If you migrate to k3s-in-Lima, change `OLLAMA_URL` in `values.yaml` from
 
 ## Access
 
-After `make deploy`, add this to `/etc/hosts` on every device that should
-reach the UI:
+After `make deploy`, make sure Pi-hole has a DNS record for the hyphenless LAN
+hostname:
 
 ```
-127.0.0.1   local-llm.lan          # on this Mac itself
-192.168.x.y local-llm.lan          # on other devices on the LAN (Mac's IP)
+192.168.4.56 localllm.lan
 ```
 
-Then visit <http://local-llm.lan:8080>. (The platform exposes ingress on
-8080/8443 because ports 80/443 are commonly taken by other Mac services
-like Pi-hole — change in
-[`platform/components/ingress-nginx/values.yaml`](../../platform/components/ingress-nginx/values.yaml)
-if your machine has them free.)
+Then visit <http://localllm.lan>. Ingress owns normal HTTP port 80, so no port
+number is needed.
 
 ## Auto-deploy
 
