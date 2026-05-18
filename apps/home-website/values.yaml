@@ -35,6 +35,8 @@ services:
         value: http://pihole.lan/
       - name: HOMEBRIDGE_URL
         value: http://homebridge.lan/
+      - name: K8S_MANAGEMENT_URL
+        value: http://k8s.lan/
 
       # User-facing links stay on Pi-hole `.lan` names. The server-side status
       # probes run inside Kubernetes, where service DNS is authoritative.
@@ -52,6 +54,8 @@ services:
         value: http://pihole-web.default.svc.cluster.local/admin/login
       - name: HOMEBRIDGE_HEALTH_URL
         value: http://homebridge-homebridge.default.svc.cluster.local:8581/
+      - name: K8S_MANAGEMENT_HEALTH_URL
+        value: http://k8s-management-ui-web.default.svc.cluster.local/api/health
 
     resources:
       requests:
