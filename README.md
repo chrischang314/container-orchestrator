@@ -192,7 +192,9 @@ changing a node selector, because current PVCs use K3s `local-path` storage.
 
 The in-repo `k8s-management-ui` workflow builds and pushes
 `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` from this
-repository before Keel rolls the UI in-cluster.
+repository before Keel rolls the UI in-cluster. The same image also powers the
+internal `k8s-cluster-status` read-only service used by the public portfolio's
+`/cluster-status/` proxy.
 
 When you go public, the polling can be replaced by a webhook from Actions for
 near-instant deploys.
