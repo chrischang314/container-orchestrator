@@ -1,0 +1,88 @@
+# Kubernetes cluster management UI.
+namespace: default
+nameOverride: k8s-management-ui
+
+imagePullSecrets:
+  - name: ghcr-creds
+
+serviceAccount:
+  create: true
+  name: k8s-management-ui
+
+rbac:
+  create: true
+  clusterRoleName: k8s-management-ui
+  rules:
+    - apiGroups: [""]
+      resources: ["nodes", "nodes/status", "namespaces", "pods", "pods/log", "services", "endpoints", "events"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: [""]
+      resources: ["nodes"]
+      verbs: ["patch", "update"]
+    - apiGroups: [""]
+      resources: ["pods"]
+      verbs: ["delete"]
+    - apiGroups: ["policy"]
+      resources: ["pods/eviction"]
+      verbs: ["create"]
+    - apiGroups: ["apps"]
+      resources: ["deployments", "replicasets", "daemonsets", "statefulsets"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: ["apps"]
+      resources: ["deployments"]
+      verbs: ["patch", "update"]
+    - apiGroups: ["apps"]
+      resources: ["deployments/scale"]
+      verbs: ["get", "patch", "update"]
+
+services:
+  - name: web
+    image: ghcr.io/chrischang314/container-orchestrator/k8s-management-ui
+    tag: main
+    port: 80
+    containerPort: 8080
+    replicas: 1
+    nodeSelector:
+      kubernetes.io/hostname: rpi5-control
+    autoDeploy:
+      enabled: true
+      pollSchedule: "@every 5m"
+    env:
+      - name: PORT
+        value: "8080"
+      - name: K8S_UI_ALLOW_MUTATIONS
+        value: "true"
+      - name: K8S_UI_DEMO
+        value: "false"
+      - name: K8S_UI_COMMAND_TIMEOUT_MS
+        value: "20000"
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 256Mi
+    probes:
+      readiness:
+        httpGet:
+          path: /api/health
+          port: 8080
+        initialDelaySeconds: 5
+        periodSeconds: 10
+      liveness:
+        httpGet:
+          path: /api/health
+          port: 8080
+        initialDelaySeconds: 15
+        periodSeconds: 20
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: k8s.lan
+      paths:
+        - path: /
+          pathType: Prefix
+          service: web
+          port: 80

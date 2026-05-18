@@ -45,3 +45,25 @@ app.kubernetes.io/name: {{ default .root.Release.Name .root.Values.nameOverride 
 app.kubernetes.io/instance: {{ .root.Release.Name }}
 app.kubernetes.io/component: {{ .service.name }}
 {{- end -}}
+
+{{/*
+Service account name used by deployments and optional RBAC.
+*/}}
+{{- define "app.serviceAccountName" -}}
+{{- if .Values.serviceAccount.name -}}
+{{- .Values.serviceAccount.name | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- include "app.fullname" . -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+ClusterRole name used when .Values.rbac.create is enabled.
+*/}}
+{{- define "app.rbacName" -}}
+{{- if .Values.rbac.clusterRoleName -}}
+{{- .Values.rbac.clusterRoleName | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- include "app.fullname" . -}}
+{{- end -}}
+{{- end -}}

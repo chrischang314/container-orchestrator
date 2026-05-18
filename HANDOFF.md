@@ -1,7 +1,7 @@
 # Kubernetes Cluster Handoff
 
 This is the operator handoff for the active home Kubernetes cluster as of
-2026-05-16. It is written for another LLM or human operator taking over the
+2026-05-18. It is written for another LLM or human operator taking over the
 same Mac Mini / Raspberry Pi / Synology homelab.
 
 ## Current Cluster
@@ -33,6 +33,7 @@ cluster ingress address:
 |---|---|
 | `homewebsite.lan` | `http://homewebsite.lan/` |
 | `homebridge.lan` | `http://homebridge.lan/` |
+| `k8s.lan` | `http://k8s.lan/` |
 | `localllm.lan` | `http://localllm.lan/` |
 | `modelrailroadautomation.lan` | `http://modelrailroadautomation.lan/` |
 | `modeltradingbot.lan` | `http://modeltradingbot.lan/` |
@@ -68,6 +69,7 @@ kubectl exec deploy/pihole-pihole -- pihole-FTL --config dns.hosts
 |---|---|---|---|---|
 | `home-website` | `ghcr.io/chrischang314/home-website:main` | `homewebsite.lan` | `mac-mini-worker` | Launchpad and public portfolio preview. User-facing links use `.lan`; status probes use internal K8s service DNS. |
 | `homebridge` | `homebridge/homebridge:latest` | `homebridge.lan` | `rpi5-control` | Uses `hostNetwork: true` for HomeKit/mDNS reliability. Config path is `/srv/homebridge` on the Pi. |
+| `k8s-management-ui` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | `k8s.lan` | `rpi5-control` | LAN control panel for nodes, containers, deployments, and allowlisted kubectl controls. Uses cluster-scoped RBAC. |
 | `local-llm` | `ghcr.io/chrischang314/local-llm/*:main` | `localllm.lan` | `mac-mini-worker` | Backend reaches Ollama on the Mac host through `host.lima.internal:11434`, aliasing to `192.168.5.2`. |
 | `model-railroad-automation` | `ghcr.io/chrischang314/model-railroad-automation/web-control:main` | `modelrailroadautomation.lan` | `railroad-pi3` | Train web server; talks to DCC-EX at `192.168.4.22:2560`. |
 | `model-trading-bot` | `ghcr.io/chrischang314/model-trading-bot/*:main` | `modeltradingbot.lan` | `mac-mini-worker` | Frontend plus backend with local data PVC. |
@@ -179,7 +181,7 @@ Storage-adjacent caches can move later if the NAS proves reliable and performant
 
 ```sh
 # Verify all main app hostnames from a client using Pi-hole DNS.
-for h in homewebsite homebridge localllm modelrailroadautomation modeltradingbot pihole recruitingapp; do
+for h in homewebsite homebridge k8s localllm modelrailroadautomation modeltradingbot pihole recruitingapp; do
   curl -I --max-time 5 "http://${h}.lan/" | sed -n "1p"
 done
 

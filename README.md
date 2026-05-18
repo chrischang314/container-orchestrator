@@ -51,6 +51,7 @@ numbers:
 |---|---|---|
 | `http://homewebsite.lan/` | Homelab launchpad and portfolio preview | Mac Mini worker |
 | `http://homebridge.lan/` | Homebridge UI | Raspberry Pi 5 control plane |
+| `http://k8s.lan/` | Kubernetes cluster management UI | Raspberry Pi 5 control plane |
 | `http://localllm.lan/` | Local LLM chat frontend | Mac Mini worker |
 | `http://modelrailroadautomation.lan/` | Railroad control web server | Railroad Pi worker |
 | `http://modeltradingbot.lan/` | Trading bot frontend | Mac Mini worker |
@@ -101,6 +102,7 @@ platform/
   components/              cluster add-ons applied by bootstrap.sh
 charts/app/                generic reusable Helm chart for an "app"
 apps/<name>/values.yaml    per-app config consumed by charts/app
+.github/workflows/         in-repo image builds, including k8s-management-ui
 ci/templates/              drop-in GitHub Actions workflow for app repos
 scripts/                   deploy / status / switch-cluster
 ```
@@ -191,6 +193,10 @@ NAS once the worker is available.
 2. [Keel](https://keel.sh) polls GHCR every 5 minutes. When `:main`'s digest
    changes, Keel triggers a rolling update of the matching Deployment.
 3. Stateful pods retain their PVCs across the rollout.
+
+The in-repo `k8s-management-ui` workflow builds and pushes
+`ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` from this
+repository before Keel rolls the UI in-cluster.
 
 When you go public, the polling can be replaced by a webhook from Actions for
 near-instant deploys.

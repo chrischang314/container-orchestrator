@@ -9,6 +9,16 @@ nameOverride: ""             # defaults to the helm release name
 # run platform/components/ghcr-secret.sh to create the secret.
 imagePullSecrets: []
 
+serviceAccount:
+  create: false
+  name: ""
+  annotations: {}
+
+rbac:
+  create: false
+  clusterRoleName: ""
+  rules: []
+
 # List of services that make up this app. Each becomes one Deployment +
 # (optionally) one Service + one PVC per persistence entry.
 services: []

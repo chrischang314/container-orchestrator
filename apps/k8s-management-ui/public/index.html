@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>K8s Control Panel</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">container-orchestrator</p>
+          <h1>K8s Control Panel</h1>
+        </div>
+        <div class="toolbar">
+          <span class="cluster-mode" data-testid="cluster-mode">connecting</span>
+          <button class="icon-button" id="refreshButton" type="button" title="Refresh cluster state" aria-label="Refresh cluster state">Refresh</button>
+        </div>
+      </header>
+
+      <main>
+        <section class="summary-strip" id="summaryStrip" data-testid="summary-strip"></section>
+
+        <section class="workspace">
+          <div class="topology-panel">
+            <div class="section-heading">
+              <h2>Nodes</h2>
+              <span id="lastUpdated">--</span>
+            </div>
+            <div class="node-map" id="nodeMap" data-testid="node-map"></div>
+          </div>
+
+          <div class="details-panel">
+            <div class="section-heading">
+              <h2>Node Containers</h2>
+              <span id="selectedNodeLabel">--</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Namespace</th>
+                    <th>Pod</th>
+                    <th>Container</th>
+                    <th>Image</th>
+                    <th>State</th>
+                    <th>Restarts</th>
+                  </tr>
+                </thead>
+                <tbody id="containerRows"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="workspace lower-grid">
+          <div class="deployments-panel">
+            <div class="section-heading">
+              <h2>Deployments</h2>
+              <span id="deploymentCount">--</span>
+            </div>
+            <div class="deployment-list" id="deploymentList"></div>
+          </div>
+
+          <div class="console-panel">
+            <div class="section-heading">
+              <h2>Command</h2>
+              <span id="commandState">idle</span>
+            </div>
+            <form id="commandForm" class="command-form">
+              <input id="commandInput" name="command" type="text" value="kubectl get pods -A" autocomplete="off" spellcheck="false" data-testid="command-input">
+              <button id="runCommandButton" type="submit">Run</button>
+            </form>
+            <pre id="commandOutput" data-testid="command-output"></pre>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
