@@ -161,29 +161,25 @@ Homebridge UI is available at `http://homebridge.lan`. Keel polls
 `homebridge/homebridge:latest` daily and recreates the pod when the digest
 changes.
 
-## Synology storage worker plan
+## Synology storage path
 
-The Synology NAS was discovered at `192.168.4.33` / `Synology.local`; DSM web,
-SMB, and HTTPS ports answer, but SSH on port 22 is currently refused. Do not
-move database or PVC-backed workloads until SSH or another admin automation path
-is enabled and the NAS has joined the K3s cluster.
+The Synology NAS is reachable at `192.168.4.33` / `Synology.local` and SSH
+works with an administrator DSM account. A direct K3s worker install was tested
+on DSM 7.3.2 / x86_64 and cleaned up afterward. The agent can install, contact
+the control plane, and start containerd, but kubelet exits because the DSM
+kernel does not expose the `pids` cgroup controller. Kubelet PID-limit
+workarounds did not bypass K3s's preflight check.
 
-Recommended next steps:
-
-1. In DSM, enable SSH under **Control Panel -> Terminal & SNMP**.
-2. Install Container Manager if the model supports it, then confirm CPU
-   architecture and DSM version.
-3. Join the NAS as a K3s worker using the Raspberry Pi 5 control plane token.
-4. Label it with `workload-tier=storage`, `hardware=synology`, and a stable
-   hostname label.
-5. Migrate stateful workloads deliberately. Local-path PVCs are node-local, so
-   PostgreSQL should move by backup/restore rather than by simply changing a
-   node selector.
+Do not move database or PVC-backed workloads to the NAS as a direct worker
+unless Synology provides a kernel with `CONFIG_CGROUP_PIDS`, or unless a Linux
+VM is created on the NAS and joined as the worker instead. The safer near-term
+storage path is to export NAS storage over NFS and use an NFS-backed
+StorageClass while the pods continue to run on Kubernetes-capable nodes.
 
 Current storage-heavy workloads are `postgres-postgres`,
 `model-trading-bot-backend`, `local-llm-backend`, and the recruiting app's
-scraper/API cache PVCs. PostgreSQL is the first real database candidate for the
-NAS once the worker is available.
+scraper/API cache PVCs. PostgreSQL should move by backup/restore, not by simply
+changing a node selector, because current PVCs use K3s `local-path` storage.
 
 ## Auto-deploy flow
 
