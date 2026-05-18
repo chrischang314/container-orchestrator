@@ -1,4 +1,4 @@
-# Chris Chang Projects dashboard.
+# LAN launchpad for homelab projects and public-safe portfolio previews.
 namespace: default
 nameOverride: home-website
 
@@ -9,34 +9,57 @@ services:
   - name: web
     image: ghcr.io/chrischang314/home-website
     tag: main
-    port: 16000
+    port: 80
     containerPort: 8080
     replicas: 1
     nodeSelector:
       kubernetes.io/hostname: mac-mini-worker
+    autoDeploy:
+      enabled: true
+      pollSchedule: "@every 5m"
+
     env:
       - name: SITE_AUDIENCE
         value: home
       - name: PORT
         value: "8080"
       - name: MODEL_RAILROAD_URL
-        value: "http://modelrailroadautomation.lan/"
+        value: http://modelrailroadautomation.lan/
       - name: TRADING_BOT_URL
-        value: "http://modeltradingbot.lan/"
+        value: http://modeltradingbot.lan/
       - name: LOCAL_LLM_URL
-        value: "http://localllm.lan/"
+        value: http://localllm.lan/
       - name: RECRUITING_APP_URL
-        value: "http://recruitingapp.lan/"
+        value: http://recruitingapp.lan/
       - name: PIHOLE_URL
-        value: "http://pihole.lan/admin/"
+        value: http://pihole.lan/
       - name: HOMEBRIDGE_URL
-        value: "http://homebridge.lan/"
+        value: http://homebridge.lan/
+
+      # User-facing links stay on Pi-hole `.lan` names. The server-side status
+      # probes run inside Kubernetes, where service DNS is authoritative.
+      - name: MODEL_RAILROAD_HEALTH_URL
+        value: http://model-railroad-automation-web-control.default.svc.cluster.local:15000/health
+      - name: TRADING_BOT_UI_HEALTH_URL
+        value: http://model-trading-bot-frontend.default.svc.cluster.local:14000/
+      - name: TRADING_BOT_API_HEALTH_URL
+        value: http://model-trading-bot-backend.default.svc.cluster.local:8000/health
+      - name: LOCAL_LLM_HEALTH_URL
+        value: http://local-llm-frontend.default.svc.cluster.local:12000/
+      - name: RECRUITING_APP_HEALTH_URL
+        value: http://recruiting-app-frontend.default.svc.cluster.local:13000/
+      - name: PIHOLE_HEALTH_URL
+        value: http://pihole-web.default.svc.cluster.local/admin/login
+      - name: HOMEBRIDGE_HEALTH_URL
+        value: http://homebridge-homebridge.default.svc.cluster.local:8581/
+
     resources:
       requests:
-        cpu: 25m
+        cpu: 50m
         memory: 64Mi
       limits:
-        memory: 128Mi
+        memory: 256Mi
+
     probes:
       readiness:
         httpGet:
@@ -55,9 +78,9 @@ ingress:
   enabled: true
   className: nginx
   hosts:
-    - host: projects.lan
+    - host: homewebsite.lan
       paths:
         - path: /
           pathType: Prefix
           service: web
-          port: 16000
+          port: 80

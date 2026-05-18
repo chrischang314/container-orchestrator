@@ -3,10 +3,13 @@
 Self-hosted Kubernetes platform for running containerized GitHub apps on a Mac
 Mini, with automatic image-driven deployments from GHCR.
 
+For a point-in-time operator handoff with current nodes, URLs, storage, and
+migration notes, see [`HANDOFF.md`](HANDOFF.md).
+
 ## Goals
 
-- One Mac Mini today; cluster grows by adding more Mac Minis later, without
-  rebuilding anything.
+- Raspberry Pi 5 control plane for high availability, with the Mac Mini and
+  other machines joined as workers without rebuilding app manifests.
 - Apps live in their own GitHub repos. CI builds an image, pushes it to GHCR,
   and the cluster picks it up on its next poll — no manual `kubectl apply`.
 - Stateful apps survive rolling updates (PVCs).
@@ -36,6 +39,27 @@ make bootstrap     # one-time: install platform components on the active context
 make deploy        # apply every app under apps/
 make status        # show cluster + apps + ingress URLs
 ```
+
+## Current LAN inventory
+
+The active cluster is `rpi5-k3s`: Raspberry Pi 5 control plane, Mac Mini
+compute worker, and a Raspberry Pi railroad edge worker. Pi-hole resolves
+project hostnames to the ingress controller, so these URLs do not need port
+numbers:
+
+| URL | Workload | Placement |
+|---|---|---|
+| `http://homewebsite.lan/` | Homelab launchpad and portfolio preview | Mac Mini worker |
+| `http://homebridge.lan/` | Homebridge UI | Raspberry Pi 5 control plane |
+| `http://localllm.lan/` | Local LLM chat frontend | Mac Mini worker |
+| `http://modelrailroadautomation.lan/` | Railroad control web server | Railroad Pi worker |
+| `http://modeltradingbot.lan/` | Trading bot frontend | Mac Mini worker |
+| `http://pihole.lan/` | Pi-hole web UI | Raspberry Pi 5 control plane |
+| `http://recruitingapp.lan/` | Recruiting/search app frontend | Mac Mini worker |
+
+Legacy LoadBalancer service ports such as `12000`, `13000`, `14000`, and
+`15000` still exist for compatibility, but normal browser access should go
+through the `.lan` ingress hostnames above.
 
 ## Day-1 setup, end to end
 
@@ -134,6 +158,30 @@ helm upgrade --install homebridge charts/app -f apps/homebridge/values.yaml \
 Homebridge UI is available at `http://homebridge.lan`. Keel polls
 `homebridge/homebridge:latest` daily and recreates the pod when the digest
 changes.
+
+## Synology storage worker plan
+
+The Synology NAS was discovered at `192.168.4.33` / `Synology.local`; DSM web,
+SMB, and HTTPS ports answer, but SSH on port 22 is currently refused. Do not
+move database or PVC-backed workloads until SSH or another admin automation path
+is enabled and the NAS has joined the K3s cluster.
+
+Recommended next steps:
+
+1. In DSM, enable SSH under **Control Panel -> Terminal & SNMP**.
+2. Install Container Manager if the model supports it, then confirm CPU
+   architecture and DSM version.
+3. Join the NAS as a K3s worker using the Raspberry Pi 5 control plane token.
+4. Label it with `workload-tier=storage`, `hardware=synology`, and a stable
+   hostname label.
+5. Migrate stateful workloads deliberately. Local-path PVCs are node-local, so
+   PostgreSQL should move by backup/restore rather than by simply changing a
+   node selector.
+
+Current storage-heavy workloads are `postgres-postgres`,
+`model-trading-bot-backend`, `local-llm-backend`, and the recruiting app's
+scraper/API cache PVCs. PostgreSQL is the first real database candidate for the
+NAS once the worker is available.
 
 ## Auto-deploy flow
 
