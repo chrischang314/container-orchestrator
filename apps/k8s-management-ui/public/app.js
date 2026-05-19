@@ -56,6 +56,7 @@ function renderSummary() {
     ["Online", summary.onlineNodes],
     ["Control", summary.controlPlaneNodes],
     ["Workers", summary.workerNodes],
+    ["External", summary.externalWorkers || 0],
     ["Pods", summary.pods],
     ["Containers", summary.containers]
   ];
@@ -72,9 +73,11 @@ function renderSummary() {
 function renderNodes() {
   const control = state.snapshot.nodes.filter((node) => node.role === "control-plane");
   const workers = state.snapshot.nodes.filter((node) => node.role !== "control-plane");
+  const externalWorkers = state.snapshot.externalWorkers || [];
   els.nodeMap.innerHTML = [
     lane("Control Plane", control),
-    lane("Worker Nodes", workers)
+    lane("Worker Nodes", workers),
+    externalWorkerLane("External Workers", externalWorkers)
   ].join("");
 }
 
@@ -87,6 +90,49 @@ function lane(title, nodes) {
       <h3>${escapeHtml(title)}</h3>
       <div class="node-list">${cards}</div>
     </div>
+  `;
+}
+
+function externalWorkerLane(title, workers) {
+  const cards = workers.length
+    ? workers.map(externalWorkerCard).join("")
+    : `<div class="empty-state">No ${escapeHtml(title.toLowerCase())}</div>`;
+  return `
+    <div class="node-lane">
+      <h3>${escapeHtml(title)}</h3>
+      <div class="node-list">${cards}</div>
+    </div>
+  `;
+}
+
+function externalWorkerCard(worker) {
+  const enabled = worker.desiredReplicas > 0;
+  const status = worker.online ? "online" : enabled ? "pending" : "paused";
+  const nextReplicas = enabled ? 0 : 1;
+  const nextLabel = enabled ? "Turn off" : "Turn on";
+  const lastObserved = worker.lastObservedAt ? `Last sync ${formatTime(worker.lastObservedAt)}` : "No sync yet";
+  return `
+    <article class="external-worker-card" data-testid="external-worker-${escapeAttr(worker.name)}">
+      <div class="node-topline">
+        <span class="node-name">${escapeHtml(worker.name)}</span>
+        <span class="status-pill ${status}">${escapeHtml(worker.actualState || status)}</span>
+      </div>
+      <div class="node-meta">
+        <span>external llm worker</span>
+        <span>${escapeHtml(worker.namespace)}/${escapeHtml(worker.deployment)}</span>
+      </div>
+      <div class="node-stats">
+        <span>${escapeHtml(worker.readyReplicas)}/${escapeHtml(worker.desiredReplicas)} switch replicas</span>
+        <span class="status-pill ${enabled ? "ready" : "paused"}">desired ${escapeHtml(worker.desiredState)}</span>
+      </div>
+      <div class="node-meta">
+        <span>${escapeHtml(lastObserved)}</span>
+      </div>
+      <div class="node-actions">
+        <button type="button" data-action="scale-deployment" data-namespace="${escapeAttr(worker.namespace)}" data-name="${escapeAttr(worker.deployment)}" data-replicas="${nextReplicas}">${nextLabel}</button>
+        <button type="button" data-action="rollout-status" data-namespace="${escapeAttr(worker.namespace)}" data-name="${escapeAttr(worker.deployment)}">Status</button>
+      </div>
+    </article>
   `;
 }
 
@@ -274,7 +320,12 @@ els.commandForm.addEventListener("submit", submitCommand);
 els.nodeMap.addEventListener("click", (event) => {
   const button = event.target.closest("[data-action]");
   if (button) {
-    runAction(button.dataset.action, { nodeName: button.dataset.node });
+    runAction(button.dataset.action, {
+      nodeName: button.dataset.node,
+      namespace: button.dataset.namespace,
+      name: button.dataset.name,
+      replicas: button.dataset.replicas
+    });
     return;
   }
   const card = event.target.closest(".node-card");

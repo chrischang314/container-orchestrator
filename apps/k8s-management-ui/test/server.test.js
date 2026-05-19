@@ -71,7 +71,9 @@ test("public status mode serves sanitized cluster data and blocks controls", asy
     const cluster = await getJson(`${base}/api/cluster`);
     assert.equal(cluster.mode, "public-status");
     assert.equal(cluster.summary.nodes, 2);
-    assert.equal(cluster.summary.readyDeployments, 5);
+    assert.equal(cluster.summary.readyDeployments, 6);
+    assert.equal(cluster.summary.externalWorkers, 1);
+    assert.equal(cluster.externalWorkers[0].name, "chris-pc-2");
     assert.equal(cluster.nodes[0].containers, undefined);
     assert.equal(cluster.containers, undefined);
     assert.equal(JSON.stringify(cluster).includes("pihole-6f9fb77c8d-n2z7x"), false);

@@ -158,6 +158,14 @@ function assertName(value, field) {
   return name;
 }
 
+function assertReplicaCount(value) {
+  const replicas = Number(value);
+  if (!Number.isInteger(replicas) || replicas < 0 || replicas > 20) {
+    throw new Error("replicas must be an integer from 0 to 20.");
+  }
+  return replicas;
+}
+
 function actionToCommand(action, payload = {}) {
   switch (action) {
     case "describe-node":
@@ -175,6 +183,12 @@ function actionToCommand(action, payload = {}) {
       const namespace = assertName(payload.namespace || "default", "namespace");
       const name = assertName(payload.name, "name");
       return `kubectl rollout status deployment/${name} -n ${namespace}`;
+    }
+    case "scale-deployment": {
+      const namespace = assertName(payload.namespace || "default", "namespace");
+      const name = assertName(payload.name, "name");
+      const replicas = assertReplicaCount(payload.replicas);
+      return `kubectl scale deployment/${name} -n ${namespace} --replicas=${replicas}`;
     }
     default:
       throw new Error(`Unsupported action: ${action}`);

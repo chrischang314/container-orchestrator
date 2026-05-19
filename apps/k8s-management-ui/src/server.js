@@ -75,6 +75,7 @@ function createServer(options = {}) {
 function publicClusterSnapshot(snapshot) {
   const rawNodes = snapshot.nodes || [];
   const rawDeployments = snapshot.deployments || [];
+  const rawExternalWorkers = snapshot.externalWorkers || [];
   const rawPods = rawNodes.flatMap((node) => node.pods || []);
   const namespaces = new Map();
 
@@ -120,6 +121,8 @@ function publicClusterSnapshot(snapshot) {
       onlineNodes,
       controlPlaneNodes: Number(snapshot.summary?.controlPlaneNodes || 0),
       workerNodes: Number(snapshot.summary?.workerNodes || 0),
+      externalWorkers: rawExternalWorkers.length,
+      externalWorkersOnline: rawExternalWorkers.filter((worker) => worker.online).length,
       pods: Number(snapshot.summary?.pods || rawPods.length),
       runningPods,
       containers: Number(snapshot.summary?.containers || 0),
@@ -132,6 +135,12 @@ function publicClusterSnapshot(snapshot) {
       workloads: readyDeployments === rawDeployments.length ? "healthy" : "attention"
     },
     nodes,
+    externalWorkers: rawExternalWorkers.map((worker) => ({
+      name: worker.name,
+      online: Boolean(worker.online),
+      desiredState: worker.desiredState,
+      actualState: worker.actualState
+    })),
     namespaces: namespaceRows
   };
 }

@@ -21,13 +21,20 @@ test("mapClusterSnapshot groups pods and containers by node", () => {
   assert.equal(snapshot.summary.onlineNodes, 2);
   assert.equal(snapshot.summary.controlPlaneNodes, 1);
   assert.equal(snapshot.summary.workerNodes, 1);
-  assert.equal(snapshot.summary.deployments, 5);
+  assert.equal(snapshot.summary.externalWorkers, 1);
+  assert.equal(snapshot.summary.externalWorkersOnline, 1);
+  assert.equal(snapshot.summary.deployments, 6);
 
   const worker = snapshot.nodes.find((node) => node.name === "mac-mini-worker");
   assert.equal(worker.role, "worker");
   assert.equal(worker.online, true);
   assert.equal(worker.podCount, 3);
   assert.equal(worker.containers.some((container) => container.name === "web"), true);
+
+  const externalWorker = snapshot.externalWorkers.find((item) => item.name === "chris-pc-2");
+  assert.equal(externalWorker.online, true);
+  assert.equal(externalWorker.deployment, "chris-pc-2-ollama-switch");
+  assert.equal(externalWorker.desiredState, "on");
 });
 
 test("mapClusterSnapshot marks offline nodes", () => {

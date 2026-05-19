@@ -55,6 +55,10 @@ test("actionToCommand creates stable kubectl commands", () => {
     actionToCommand("restart-deployment", { namespace: "default", name: "k8s-management-ui-web" }),
     "kubectl rollout restart deployment/k8s-management-ui-web -n default"
   );
+  assert.equal(
+    actionToCommand("scale-deployment", { namespace: "local-llm", name: "chris-pc-2-ollama-switch", replicas: 0 }),
+    "kubectl scale deployment/chris-pc-2-ollama-switch -n local-llm --replicas=0"
+  );
 });
 
 test("actionToCommand rejects names with spaces", () => {

@@ -51,6 +51,7 @@ function renderSummary() {
     ["Deployments", `${summary.readyDeployments}/${summary.deployments}`],
     ["Namespaces", summary.namespaces],
     ["Workers", summary.workerNodes],
+    ["External", `${summary.externalWorkersOnline || 0}/${summary.externalWorkers || 0}`],
     ["Containers", summary.containers]
   ];
 

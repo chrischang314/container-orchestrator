@@ -5,6 +5,7 @@ const https = require("node:https");
 
 const DEFAULT_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token";
 const DEFAULT_CA_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt";
+const EXTERNAL_WORKER_COMPONENT = "external-worker-switch";
 
 function shouldUseDemoMode(env = process.env) {
   if (env.K8S_UI_DEMO === "true") return true;
@@ -104,6 +105,36 @@ function mapClusterSnapshot(raw, now = new Date()) {
     availableReplicas: Number(deployment.status?.availableReplicas || 0)
   }));
 
+  const externalWorkers = deploymentItems
+    .filter((deployment) =>
+      deployment.metadata?.labels?.["app.kubernetes.io/component"] === EXTERNAL_WORKER_COMPONENT
+    )
+    .map((deployment) => {
+      const metadata = deployment.metadata || {};
+      const labels = metadata.labels || {};
+      const annotations = metadata.annotations || {};
+      const replicas = Number(deployment.spec?.replicas || 0);
+      const readyReplicas = Number(deployment.status?.readyReplicas || 0);
+      const desiredState = annotations["local-llm.io/desired-state"] || (replicas > 0 ? "on" : "off");
+      const actualState = annotations["local-llm.io/actual-state"] || "unknown";
+
+      return {
+        name: labels["local-llm.io/worker"] || metadata.name || "",
+        namespace: metadata.namespace || "default",
+        deployment: metadata.name || "",
+        desiredReplicas: replicas,
+        readyReplicas,
+        availableReplicas: Number(deployment.status?.availableReplicas || 0),
+        desiredState,
+        actualState,
+        optional: labels["local-llm.io/optional"] === "true",
+        online: replicas > 0 && readyReplicas > 0 && actualState !== "off",
+        lastObservedAt: annotations["local-llm.io/last-observed-at"] || "",
+        controlHelp: annotations["local-llm.io/control-help"] || "",
+        controlledBy: annotations["local-llm.io/controlled-by"] || ""
+      };
+    });
+
   const containers = nodes.flatMap((node) =>
     node.containers.map((container) => ({
       ...container,
@@ -118,11 +149,14 @@ function mapClusterSnapshot(raw, now = new Date()) {
       onlineNodes: nodes.filter((node) => node.online).length,
       controlPlaneNodes: nodes.filter((node) => node.role === "control-plane").length,
       workerNodes: nodes.filter((node) => node.role !== "control-plane").length,
+      externalWorkers: externalWorkers.length,
+      externalWorkersOnline: externalWorkers.filter((worker) => worker.online).length,
       pods: podItems.length,
       containers: containers.length,
       deployments: deployments.length
     },
     nodes,
+    externalWorkers,
     deployments,
     containers
   };
@@ -264,7 +298,8 @@ function demoRawCluster() {
         deployment("default", "pihole-pihole", 1, 1),
         deployment("default", "homebridge-homebridge", 1, 1),
         deployment("default", "local-llm-frontend", 1, 1),
-        deployment("default", "model-trading-bot-backend", 1, 1)
+        deployment("default", "model-trading-bot-backend", 1, 1),
+        externalWorkerDeployment("local-llm", "chris-pc-2-ollama-switch", "chris-pc-2", 1, 1)
       ]
     }
   };
@@ -296,6 +331,33 @@ function pod(namespace, name, nodeName, phase, containers) {
 function deployment(namespace, name, replicas, readyReplicas) {
   return {
     metadata: { namespace, name },
+    spec: { replicas },
+    status: {
+      readyReplicas,
+      updatedReplicas: readyReplicas,
+      availableReplicas: readyReplicas
+    }
+  };
+}
+
+function externalWorkerDeployment(namespace, name, worker, replicas, readyReplicas) {
+  const state = replicas > 0 ? "on" : "off";
+  return {
+    metadata: {
+      namespace,
+      name,
+      labels: {
+        "app.kubernetes.io/component": EXTERNAL_WORKER_COMPONENT,
+        "local-llm.io/worker": worker,
+        "local-llm.io/optional": "true"
+      },
+      annotations: {
+        "local-llm.io/desired-state": state,
+        "local-llm.io/actual-state": readyReplicas > 0 ? "on" : state,
+        "local-llm.io/last-observed-at": "2026-05-17T12:00:00.000Z",
+        "local-llm.io/control-help": "Scale replicas to 1 to enable, or 0 to disable."
+      }
+    },
     spec: { replicas },
     status: {
       readyReplicas,

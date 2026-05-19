@@ -125,7 +125,7 @@ h2 {
 .summary-strip {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(6, minmax(120px, 1fr));
+  grid-template-columns: repeat(7, minmax(110px, 1fr));
   margin-bottom: 16px;
 }
 
@@ -228,15 +228,19 @@ h2 {
   gap: 10px;
 }
 
-.node-card {
+.node-card,
+.external-worker-card {
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 8px;
-  cursor: pointer;
   display: grid;
   gap: 10px;
   min-width: 0;
   padding: 12px;
+}
+
+.node-card {
+  cursor: pointer;
 }
 
 .public-node-card {
