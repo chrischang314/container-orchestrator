@@ -27,6 +27,8 @@ services:
         value: http://modelrailroadautomation.lan/
       - name: TRADING_BOT_URL
         value: http://modeltradingbot.lan/
+      - name: TRADING_BOT_PLATFORM_URL
+        value: http://tradingbot.lan/
       - name: LOCAL_LLM_URL
         value: http://localllm.lan/
       - name: RECRUITING_APP_URL
@@ -46,6 +48,8 @@ services:
         value: http://model-trading-bot-frontend.default.svc.cluster.local:14000/
       - name: TRADING_BOT_API_HEALTH_URL
         value: http://model-trading-bot-backend.default.svc.cluster.local:8000/health
+      - name: TRADING_BOT_PLATFORM_HEALTH_URL
+        value: http://trading-bot.trading-bot.svc.cluster.local/health
       - name: LOCAL_LLM_HEALTH_URL
         value: http://local-llm-frontend.default.svc.cluster.local:12000/
       - name: RECRUITING_APP_HEALTH_URL
