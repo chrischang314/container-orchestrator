@@ -93,6 +93,7 @@ ingress:
           service: web
           port: 80
   redirects:
+    # Keep the legacy launchpad hostname as a redirect to the canonical URL.
     - host: homewebsite.lan
       to: http://projects.lan/
       code: 308
