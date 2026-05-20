@@ -64,6 +64,11 @@ Legacy LoadBalancer service ports such as `12000`, `13000`, `14000`, and
 `15000` still exist for compatibility, but normal browser access should go
 through the `.lan` ingress hostnames above.
 
+Recruiting app note: the scraper runs public-preview sources with embeddings
+enabled, so newly saved post chunks should move from pending to searchable in
+the pipeline view. The scraper has a higher memory limit for BGE-M3 embedding
+backfills. OCR remains disabled until the full-content re-scrape is ready.
+
 ## Day-1 setup, end to end
 
 1. **Enable Kubernetes in Docker Desktop** —

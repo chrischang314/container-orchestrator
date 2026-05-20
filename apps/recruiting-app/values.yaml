@@ -111,9 +111,9 @@ services:
       - name: SCRAPER_IMAGE_DIR
         value: /app/data/images
       # Preview mode: crawl public post snippets before full auth works.
-      # Embedding/OCR can be enabled for the full-content re-scrape later.
+      # Keep embeddings enabled so new public-preview chunks are searchable.
       - name: SCRAPER_ENABLE_EMBED
-        value: "false"
+        value: "true"
       - name: SCRAPER_ENABLE_OCR
         value: "false"
 
@@ -122,7 +122,8 @@ services:
         cpu: 200m
         memory: 2Gi
       limits:
-        memory: 4Gi
+        # BGE-M3 embedding can exceed 4Gi while the scraper backfills chunks.
+        memory: 6Gi
 
     persistence:
       # data/ holds storage_state.json (1point3acres session) + scraped images.

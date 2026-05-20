@@ -81,7 +81,7 @@ kubectl exec deploy/pihole-pihole -- pihole-FTL --config dns.hosts
 | `model-trading-bot` | `ghcr.io/chrischang314/model-trading-bot/*:main` | `modeltradingbot.lan` | `mac-mini-worker` | Frontend plus backend with local data PVC. |
 | `pihole` | `pihole/pihole:latest` | `pihole.lan` | `rpi5-control` | DNS on port 53, web via ingress. Config paths are `/srv/pihole/etc-pihole` and `/srv/pihole/etc-dnsmasq.d`. |
 | `postgres` | `pgvector/pgvector:pg16` | internal only | `mac-mini-worker` | Shared PostgreSQL/pgvector database for recruiting app. |
-| `recruiting-app` | `ghcr.io/chrischang314/recruiting-app/*:main` | `recruitingapp.lan` | `mac-mini-worker` | API, frontend, scraper. Scraper is in preview mode without requiring 1point3acres auth. |
+| `recruiting-app` | `ghcr.io/chrischang314/recruiting-app/*:main` | `recruitingapp.lan` | `mac-mini-worker` | API, frontend, scraper. Scraper is in preview mode without requiring 1point3acres auth. Embeddings are enabled so new chunks become searchable; scraper memory is capped at 6Gi for BGE-M3 backfills. OCR remains disabled. |
 | `csb1-ota-updater` | `ghcr.io/chrischang314/model-railroad-csb1-updater:latest` | none | `railroad-pi3` | Runs in namespace `railroad`; used for train hardware support. |
 
 Legacy LoadBalancer service ports still exist for compatibility:
