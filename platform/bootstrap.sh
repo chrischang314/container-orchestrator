@@ -29,7 +29,7 @@ fi
 step "Active context: $CTX"
 case "$CTX" in
   docker-desktop) echo "   Backend: Docker Desktop Kubernetes" ;;
-  lima-k3s*|k3s*) echo "   Backend: k3s (Lima)" ;;
+  *k3s*)          echo "   Backend: k3s" ;;
   *)              warn "Unrecognized context name; continuing anyway" ;;
 esac
 
@@ -48,6 +48,8 @@ step "Adding helm repos"
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx >/dev/null 2>&1 || true
 helm repo add jetstack      https://charts.jetstack.io                >/dev/null 2>&1 || true
 helm repo add keel          https://charts.keel.sh                    >/dev/null 2>&1 || true
+helm repo add nfs-subdir-external-provisioner \
+  https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner/ >/dev/null 2>&1 || true
 helm repo update >/dev/null
 
 # 3. ingress-nginx ---------------------------------------------------------
@@ -71,7 +73,26 @@ helm upgrade --install keel keel/keel \
   -f "$ROOT/platform/components/keel/values.yaml" \
   --wait --timeout 3m
 
-# 6. Summary ---------------------------------------------------------------
+# 6. Synology NFS dynamic storage -----------------------------------------
+if [[ "$CTX" != "docker-desktop" ]]; then
+  step "Installing/upgrading Synology NFS provisioner"
+  helm upgrade --install synology-nfs \
+    nfs-subdir-external-provisioner/nfs-subdir-external-provisioner \
+    --namespace storage --create-namespace \
+    -f "$ROOT/platform/components/synology-nfs-provisioner/values.yaml" \
+    --wait --timeout 5m
+
+  if kubectl get storageclass local-path >/dev/null 2>&1; then
+    kubectl patch storageclass local-path \
+      --type=merge \
+      -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}' \
+      >/dev/null
+  fi
+else
+  warn "Skipping Synology NFS provisioner on Docker Desktop legacy backend"
+fi
+
+# 7. Summary ---------------------------------------------------------------
 step "Bootstrap complete"
 kubectl get pods -A --no-headers 2>/dev/null \
   | awk '$4 != "Running" && $4 != "Completed" {print "   not ready: " $0}' \

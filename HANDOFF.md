@@ -10,7 +10,7 @@ same Mac Mini / Raspberry Pi / Synology homelab.
 - Control plane: `rpi5-control` at `192.168.4.56`
 - Mac Mini worker: `mac-mini-worker` at `192.168.4.34`
 - Railroad edge worker: `railroad-pi3` at `192.168.4.57`
-- Synology NAS storage candidate: `Synology.local` at `192.168.4.33`
+- Synology NAS storage backend: `Synology.local` at `192.168.4.33`
 
 Node labels:
 
@@ -36,7 +36,8 @@ cluster ingress address:
 
 | Hostname | URL |
 |---|---|
-| `homewebsite.lan` | `http://homewebsite.lan/` |
+| `projects.lan` | `http://projects.lan/` |
+| `homewebsite.lan` | redirects to `http://projects.lan/` |
 | `homebridge.lan` | `http://homebridge.lan/` |
 | `localllm.lan` | `http://localllm.lan/` |
 | `modelrailroadautomation.lan` | `http://modelrailroadautomation.lan/` |
@@ -71,7 +72,7 @@ kubectl exec deploy/pihole-pihole -- pihole-FTL --config dns.hosts
 
 | App | Repo/image | LAN URL | Placement | Notes |
 |---|---|---|---|---|
-| `home-website` | `ghcr.io/chrischang314/home-website:main` | `homewebsite.lan` | `mac-mini-worker` | Launchpad and public portfolio preview. User-facing links use `.lan`; status probes use internal K8s service DNS. |
+| `home-website` | `ghcr.io/chrischang314/home-website:main` | `projects.lan` | `mac-mini-worker` | Launchpad and public portfolio preview. `homewebsite.lan` redirects here. User-facing links use `.lan`; status probes use internal K8s service DNS. |
 | `homebridge` | `homebridge/homebridge:latest` | `homebridge.lan` | `rpi5-control` | Uses `hostNetwork: true` for HomeKit/mDNS reliability. Config path is `/srv/homebridge` on the Pi. |
 | `local-llm` | `ghcr.io/chrischang314/local-llm/*:main` | `localllm.lan` | `mac-mini-worker` | Backend reaches Ollama on the Mac host through `host.lima.internal:11434`, aliasing to `192.168.5.2`. |
 | `model-railroad-automation` | `ghcr.io/chrischang314/model-railroad-automation/web-control:main` | `modelrailroadautomation.lan` | `railroad-pi3` | Train web server; talks to DCC-EX at `192.168.4.22:2560`. |
@@ -114,9 +115,33 @@ enabled. Most private GHCR images use the `ghcr-creds` image pull secret.
 
 ## Storage
 
-The default StorageClass is `local-path` from K3s. PVCs are node-local, so a
-pod's data follows the node where the PVC was first bound. Current PVC-backed
-workloads:
+The default StorageClass is now `synology-nfs`. It dynamically provisions
+directories under the NAS NFS export `192.168.4.33:/volume1/k8s` through the
+`nfs-subdir-external-provisioner` Helm chart. The provisioner values are tracked
+in
+[`platform/components/synology-nfs-provisioner/values.yaml`](platform/components/synology-nfs-provisioner/values.yaml).
+
+Important storage classes:
+
+| StorageClass | Purpose | Notes |
+|---|---|---|
+| `synology-nfs` | Default for new PVCs | Reclaim policy is `Retain`; directories are preserved if a PVC is deleted. |
+| `local-path` | Legacy K3s node-local PVCs | Still present for existing PVCs and rollback, but no longer default. |
+
+Operational checks:
+
+```sh
+kubectl get sc
+kubectl get pods -n storage -o wide
+kubectl logs -n storage deploy/synology-nfs-nfs-subdir-external-provisioner --tail=50
+```
+
+NFS mount smoke tests have passed from `mac-mini-worker` and `railroad-pi3`.
+The provisioner itself is pinned to `rpi5-control`, where NFS client support is
+also present.
+
+Current PVC-backed workloads were created before Synology became the default,
+so they still use `local-path` until a planned data migration is performed:
 
 | PVC | Current purpose |
 |---|---|
@@ -128,9 +153,11 @@ workloads:
 | `recruiting-app-scraper-hf-cache` | Scraper embedding/cache data |
 
 Do not move a stateful Deployment by only changing `nodeSelector`; with
-local-path PVCs that can leave the pod pending or detached from its data. For
-PostgreSQL, use logical backup/restore (`pg_dump` / restore) or a planned PV
-copy. For app caches, decide whether they can be rebuilt before migrating.
+local-path PVCs that can leave the pod pending or detached from its data. Do
+not delete these PVCs to force reprovisioning unless a backup has already been
+verified. For PostgreSQL, use logical backup/restore (`pg_dump` / restore) or a
+careful cold copy with the database stopped. For app caches, decide whether
+they can be rebuilt before migrating.
 
 ## Synology Worker Status
 
@@ -159,17 +186,17 @@ Do not retry a direct DSM-hosted K3s worker unless Synology ships a kernel with
 NAS. Containers on DSM share the DSM kernel, so a containerized K3s worker would
 hit the same cgroup limit.
 
-The practical storage path is NFS:
+The practical storage path is NFS, and the first four steps are complete:
 
-1. Enable NFS service in DSM.
-2. Create a shared folder for Kubernetes volumes, for example `k8s`.
-3. Export it to the LAN or at least the active K3s node IPs.
-4. Install an NFS-backed StorageClass in this cluster.
-5. Migrate PostgreSQL by dump/restore into a new PVC on that StorageClass.
+1. NFS service is enabled in DSM.
+2. DSM exports `/volume1/k8s` to `192.168.4.0/22`.
+3. `synology-nfs` is installed and set as the default StorageClass.
+4. Mounts have been tested from each active worker node.
+5. Remaining work: migrate existing local-path PVC data into new
+   Synology-backed PVCs.
 
-Recommended first migration target after NFS is available: `postgres`.
-Storage-adjacent caches can move later if the NAS proves reliable and
-performant.
+Recommended first migration target: `postgres`. Storage-adjacent caches can
+move later if the NAS proves reliable and performant.
 
 ## Learned Nuances
 
@@ -190,6 +217,8 @@ performant.
 - Railroad control is intentionally placed on the Pi near the train hardware.
 - Synology DSM 7.3.2 on this DS225+ cannot run a direct K3s worker because its
   kernel lacks the `pids` cgroup controller.
+- Synology is still useful as the cluster storage backend through NFS-backed
+  PVCs; use `synology-nfs` for new persistent workloads.
 - Do not commit kubeconfigs, K3s tokens, Pi-hole passwords, NAS credentials, or
   Homebridge pairing secrets.
 
@@ -197,7 +226,7 @@ performant.
 
 ```sh
 # Verify all main app hostnames from a client using Pi-hole DNS.
-for h in homewebsite homebridge localllm modelrailroadautomation modeltradingbot pihole recruitingapp; do
+for h in projects homebridge localllm modelrailroadautomation modeltradingbot pihole recruitingapp; do
   curl -I --max-time 5 "http://${h}.lan/" | sed -n "1p"
 done
 
@@ -208,4 +237,8 @@ helm upgrade --install home-website charts/app \
 
 # Check a rollout.
 kubectl rollout status deployment/home-website-web --timeout=120s
+
+# Verify Synology-backed dynamic storage.
+kubectl get sc synology-nfs
+kubectl get pods -n storage -o wide
 ```

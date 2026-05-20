@@ -1,0 +1,34 @@
+# Synology-backed dynamic PVC provisioning.
+#
+# DSM exports /volume1/k8s from Synology.local / 192.168.4.33 over NFS to the
+# LAN. The provisioner is pinned to the always-on Raspberry Pi control plane,
+# which has the NFS client tools installed.
+
+replicaCount: 1
+strategyType: Recreate
+
+nfs:
+  server: 192.168.4.33
+  path: /volume1/k8s
+
+storageClass:
+  create: true
+  name: synology-nfs
+  defaultClass: true
+  allowVolumeExpansion: true
+  # Keep directories if a PVC is accidentally deleted. Database migrations can
+  # clean up old folders manually once backups are confirmed.
+  reclaimPolicy: Retain
+  archiveOnDelete: true
+  accessModes: ReadWriteOnce
+  volumeBindingMode: Immediate
+
+nodeSelector:
+  kubernetes.io/hostname: rpi5-control
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 64Mi
+  limits:
+    memory: 128Mi

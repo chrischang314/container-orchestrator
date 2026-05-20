@@ -172,29 +172,11 @@ ingress:
   hosts:
     - host: recruitingapp.lan
       paths:
-        # API routes go to the backend; everything else to the Next.js frontend.
-        - path: /api
-          pathType: Prefix
-          service: api
-          port: 8000
+        # Keep browser routes on the Next.js frontend. The frontend talks to
+        # FastAPI through the in-cluster API_URL, and its /api/translate route
+        # is a Next.js proxy endpoint.
         - path: /healthz
           pathType: Exact
-          service: api
-          port: 8000
-        - path: /stats
-          pathType: Prefix
-          service: api
-          port: 8000
-        - path: /companies
-          pathType: Prefix
-          service: api
-          port: 8000
-        - path: /posts
-          pathType: Prefix
-          service: api
-          port: 8000
-        - path: /search
-          pathType: Prefix
           service: api
           port: 8000
         - path: /

@@ -71,4 +71,10 @@ ingress:
   #       pathType: Prefix
   #       service: frontend
   #       port: 80
+  redirects: []
+  # - host: old-name.lan
+  #   to: http://new-name.lan/
+  #   code: 308
+  #   service: frontend             # backend is required by Kubernetes
+  #   port: 80
   tls: []                      # populate when cert-manager + ClusterIssuer are configured

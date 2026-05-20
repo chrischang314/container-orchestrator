@@ -1,0 +1,32 @@
+{{- if and .Values.ingress.enabled .Values.ingress.redirects }}
+{{- $root := . }}
+{{- range $redirect := .Values.ingress.redirects }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ printf "%s-redirect-%s" (include "app.fullname" $root) ($redirect.host | replace "." "-" | replace "*" "wildcard") | trunc 63 | trimSuffix "-" }}
+  namespace: {{ $root.Values.namespace | default "default" }}
+  labels:
+    {{- include "app.labels" $root | nindent 4 }}
+  annotations:
+    nginx.ingress.kubernetes.io/permanent-redirect: {{ $redirect.to | quote }}
+    nginx.ingress.kubernetes.io/permanent-redirect-code: {{ default 308 $redirect.code | quote }}
+    {{- with $redirect.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ default ($root.Values.ingress.className | default "nginx") $redirect.className }}
+  rules:
+    - host: {{ $redirect.host }}
+      http:
+        paths:
+          - path: {{ $redirect.path | default "/" }}
+            pathType: {{ $redirect.pathType | default "Prefix" }}
+            backend:
+              service:
+                name: {{ include "app.serviceFullname" (dict "root" $root "service" (dict "name" $redirect.service)) }}
+                port:
+                  number: {{ $redirect.port }}
+{{- end }}
+{{- end }}

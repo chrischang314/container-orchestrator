@@ -49,7 +49,7 @@ numbers:
 
 | URL | Workload | Placement |
 |---|---|---|
-| `http://homewebsite.lan/` | Homelab launchpad and portfolio preview | Mac Mini worker |
+| `http://projects.lan/` | Homelab launchpad and portfolio preview | Mac Mini worker |
 | `http://homebridge.lan/` | Homebridge UI | Raspberry Pi 5 control plane |
 | `http://localllm.lan/` | Local LLM chat frontend | Mac Mini worker |
 | `http://modelrailroadautomation.lan/` | Railroad control web server | Railroad Pi worker |
@@ -60,6 +60,9 @@ numbers:
 Legacy LoadBalancer service ports such as `12000`, `13000`, `14000`, and
 `15000` still exist for compatibility, but normal browser access should go
 through the `.lan` ingress hostnames above.
+
+`http://homewebsite.lan/` is kept as a compatibility alias and redirects to
+`http://projects.lan/`.
 
 ## Day-1 setup, end to end
 
@@ -99,6 +102,7 @@ platform/
   docker-desktop/          notes for enabling DD's built-in K8s
   k3s/                     Lima VM configs + migration doc (dormant today)
   components/              cluster add-ons applied by bootstrap.sh
+    synology-nfs-provisioner/  Helm values for Synology-backed PVCs
 charts/app/                generic reusable Helm chart for an "app"
 apps/<name>/values.yaml    per-app config consumed by charts/app
 ci/templates/              drop-in GitHub Actions workflow for app repos
@@ -174,10 +178,22 @@ VM is created on the NAS and joined as the worker instead. The safer near-term
 storage path is to export NAS storage over NFS and use an NFS-backed
 StorageClass while the pods continue to run on Kubernetes-capable nodes.
 
+That safer path is now active. DSM exports `192.168.4.33:/volume1/k8s` over
+NFS, and the cluster has a `synology-nfs` StorageClass installed from
+[`platform/components/synology-nfs-provisioner/values.yaml`](platform/components/synology-nfs-provisioner/values.yaml).
+`synology-nfs` is the cluster default for new PVCs; `local-path` remains
+installed only for existing volumes and emergency rollback.
+
+The provisioner pod is pinned to `rpi5-control`. NFS mounts have been smoke
+tested from `mac-mini-worker` and `railroad-pi3`, so future PVC-backed pods can
+mount Synology storage from any current Kubernetes node.
+
 Current storage-heavy workloads are `postgres-postgres`,
 `model-trading-bot-backend`, `local-llm-backend`, and the recruiting app's
-scraper/API cache PVCs. PostgreSQL should move by backup/restore, not by simply
-changing a node selector, because current PVCs use K3s `local-path` storage.
+scraper/API cache PVCs. These were created before Synology became the default
+and still use K3s `local-path` storage. They should move by a planned backup
+and restore or cold copy into new Synology-backed PVCs, not by simply changing
+a node selector or deleting PVCs in place.
 
 ## Auto-deploy flow
 

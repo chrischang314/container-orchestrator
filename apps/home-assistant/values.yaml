@@ -1,0 +1,86 @@
+# Home Assistant - home automation control plane on the always-on Raspberry Pi 5.
+#
+# Runtime data lives on the Pi at /srv/home-assistant. The seed configuration is
+# tracked in the private chrischang314/home-assistant repo and copied there
+# before the first deploy.
+
+namespace: default
+nameOverride: home-assistant
+
+services:
+  - name: server
+    image: ghcr.io/home-assistant/home-assistant
+    tag: stable
+    replicas: 1
+    port: 8123
+
+    # Home Assistant discovery and several integrations expect the host network.
+    hostNetwork: true
+    strategy:
+      type: Recreate
+    nodeSelector:
+      kubernetes.io/hostname: rpi5-control
+
+    # Keel polls GHCR and recreates the pod when :stable changes.
+    autoDeploy:
+      enabled: true
+      pollSchedule: "@every 24h"
+
+    env:
+      - name: TZ
+        value: America/New_York
+
+    # Matches Home Assistant's documented container install. This can be reduced
+    # later after confirming which integrations and host devices are required.
+    securityContext:
+      privileged: true
+
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        memory: 2Gi
+
+    probes:
+      startup:
+        httpGet:
+          path: /
+          port: 8123
+        initialDelaySeconds: 30
+        periodSeconds: 10
+        failureThreshold: 30
+      readiness:
+        httpGet:
+          path: /
+          port: 8123
+        initialDelaySeconds: 10
+        periodSeconds: 10
+        failureThreshold: 12
+      liveness:
+        httpGet:
+          path: /
+          port: 8123
+        initialDelaySeconds: 120
+        periodSeconds: 30
+        failureThreshold: 3
+
+    persistence:
+      - name: config
+        mountPath: /config
+        hostPath: /srv/home-assistant
+      - name: dbus
+        mountPath: /run/dbus
+        hostPath: /run/dbus
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: homeassistant.lan
+      paths:
+        - path: /
+          pathType: Prefix
+          service: server
+          port: 8123
+
