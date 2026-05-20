@@ -72,6 +72,12 @@ pipeline after the full-content rebuild. If the session returns `user_banned`
 or "用户组: 不准访问", keep scraper replicas at 0 until a permitted
 `storage_state.json` is copied into the scraper PVC.
 
+While 1point3acres is blocked, the deployed scraper runs Hacker News + Reddit
+only with a faster public-source profile: 6 configured in-flight requests,
+1-2 seconds between request starts, 100 Hacker News results per query, 50
+Reddit results per query, and a 1-hour crawl interval. Keep replicas at 1
+because each pod runs the full scheduler.
+
 ## Day-1 setup, end to end
 
 1. **Enable Kubernetes in Docker Desktop** —

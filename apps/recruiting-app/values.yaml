@@ -9,8 +9,8 @@
 #        cd /Users/chrischang/Projects/recruiting-app && python scripts/login.py
 #        POD=$(kubectl get pod -l app.kubernetes.io/component=scraper -o jsonpath='{.items[0].metadata.name}')
 #        kubectl cp data/storage_state.json $POD:/app/data/storage_state.json
-#   5. Keep scraper replicas at 0 until the login helper confirms the mobile API
-#      returns an authenticated member_uid and not user_banned.
+#   5. 1point3acres should remain disabled until the login helper confirms the
+#      mobile API returns an authenticated member_uid and not user_banned.
 
 namespace: default
 nameOverride: recruiting-app
@@ -87,10 +87,7 @@ services:
     image: ghcr.io/chrischang314/recruiting-app/scraper
     tag: onepoint-full-20260520-0218
     # No port — daemon only, no HTTP surface.
-    # Paused while the current 1point3acres account/session returns user_banned.
-    # Set to 1 only after refreshing data/storage_state.json with a permitted
-    # account and copying it into the scraper PVC.
-    replicas: 0
+    replicas: 1
     strategy:
       type: Recreate
     nodeSelector:
@@ -107,15 +104,15 @@ services:
       - name: HF_HOME
         value: /app/.hf-cache
       - name: SCRAPER_SOURCES
-        value: 1point3acres
+        value: hackernews,reddit
       - name: SCRAPER_HEADLESS
         value: "true"
       - name: SCRAPER_STORAGE_STATE_PATH
         value: /app/data/storage_state.json
       - name: SCRAPER_USE_STORAGE_STATE
-        value: "true"
+        value: "false"
       - name: SCRAPER_REQUIRE_STORAGE_STATE
-        value: "true"
+        value: "false"
       - name: SCRAPER_IMAGE_DIR
         value: /app/data/images
       - name: SCRAPER_MIN_REQUEST_INTERVAL_SECS
@@ -123,7 +120,7 @@ services:
       - name: SCRAPER_MAX_REQUEST_INTERVAL_SECS
         value: "2.0"
       - name: SCRAPER_MAX_CONCURRENT_REQUESTS
-        value: "3"
+        value: "6"
       - name: SCRAPER_REFRESH_EXISTING_POSTS
         value: "false"
       - name: SCRAPER_MAX_PAGES_PER_CATEGORY
@@ -140,6 +137,14 @@ services:
         value: "true"
       - name: SCRAPER_ENABLE_OCR
         value: "true"
+      - name: SCRAPER_ENABLE_QUESTION
+        value: "true"
+      - name: SCRAPER_CRAWL_INTERVAL_HOURS
+        value: "1.0"
+      - name: SCRAPER_REDDIT_LIMIT_PER_QUERY
+        value: "50"
+      - name: SCRAPER_HACKERNEWS_LIMIT_PER_QUERY
+        value: "100"
 
     resources:
       requests:
