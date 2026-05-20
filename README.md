@@ -64,10 +64,13 @@ Legacy LoadBalancer service ports such as `12000`, `13000`, `14000`, and
 `15000` still exist for compatibility, but normal browser access should go
 through the `.lan` ingress hostnames above.
 
-Recruiting app note: the scraper runs public-preview sources with embeddings
-enabled, so newly saved post chunks should move from pending to searchable in
-the pipeline view. The scraper has a higher memory limit for BGE-M3 embedding
-backfills. OCR remains disabled until the full-content re-scrape is ready.
+Recruiting app note: the scraper now requires a copied
+`data/storage_state.json` for authenticated 1point3acres access. It uses the
+Discuz mobile JSON endpoint plus rendered-page enrichment, with embeddings and
+OCR enabled so full-post text, replies, images, and OCR move into the searchable
+pipeline after the full-content rebuild. If the session returns `user_banned`
+or "用户组: 不准访问", keep scraper replicas at 0 until a permitted
+`storage_state.json` is copied into the scraper PVC.
 
 ## Day-1 setup, end to end
 
