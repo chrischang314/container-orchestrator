@@ -86,9 +86,15 @@ ingress:
   enabled: true
   className: nginx
   hosts:
-    - host: homewebsite.lan
+    - host: projects.lan
       paths:
         - path: /
           pathType: Prefix
           service: web
           port: 80
+  redirects:
+    - host: homewebsite.lan
+      to: http://projects.lan/
+      code: 308
+      service: web
+      port: 80
