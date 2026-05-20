@@ -212,3 +212,6 @@ helm upgrade --install home-website charts/app \
 # Check a rollout.
 kubectl rollout status deployment/home-website-web --timeout=120s
 ```
+## Agent Operating Policy
+
+Project-specific Codex rules now live in `AGENTS.md`. Use them before adding worker nodes or deploying containers. The important rule is simple: after any deployment, verify Helm lint, rollout status, pod health/logs when needed, and the LAN or health endpoint before calling the work complete.

@@ -3,6 +3,8 @@
 Self-hosted Kubernetes platform for running containerized GitHub apps on a Mac
 Mini, with automatic image-driven deployments from GHCR.
 
+Project-specific Codex operating rules live in [`AGENTS.md`](AGENTS.md). Use them for adding worker nodes, deploying app containers, and verifying health after rollout.
+
 For a point-in-time operator handoff with current nodes, URLs, storage, and
 migration notes, see [`HANDOFF.md`](HANDOFF.md).
 
