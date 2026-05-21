@@ -3,7 +3,7 @@
 const fs = require("node:fs");
 const http = require("node:http");
 const path = require("node:path");
-const { actionToCommand, runKubectl } = require("./command");
+const { actionToCommand, runKubectl, validateKubectlCommand } = require("./command");
 const { createKubernetesClient, shouldUseDemoMode } = require("./kubernetes");
 
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
@@ -49,7 +49,10 @@ function createServer(options = {}) {
       if (req.method === "POST" && url.pathname === "/api/command") {
         if (publicStatus) return json(res, 403, { ok: false, error: "Command endpoints are disabled in public status mode." });
         const body = await readJson(req);
-        const result = await commandRunner(body.command);
+        const command = String(body.command || "").trim();
+        const confirmation = requireMutationConfirmation(command, body, allowMutations);
+        if (confirmation) return json(res, 409, confirmation);
+        const result = await commandRunner(command);
         return json(res, result.ok ? 200 : 400, result);
       }
 
@@ -57,6 +60,8 @@ function createServer(options = {}) {
         if (publicStatus) return json(res, 403, { ok: false, error: "Action endpoints are disabled in public status mode." });
         const body = await readJson(req);
         const command = actionToCommand(body.action, body);
+        const confirmation = requireMutationConfirmation(command, body, allowMutations);
+        if (confirmation) return json(res, 409, confirmation);
         const result = await commandRunner(command);
         return json(res, result.ok ? 200 : 400, result);
       }
@@ -70,6 +75,19 @@ function createServer(options = {}) {
       return json(res, 500, { ok: false, error: error.message });
     }
   });
+}
+
+function requireMutationConfirmation(command, body, allowMutations) {
+  const validation = validateKubectlCommand(command, { allowMutations });
+  if (!validation.ok || !validation.mutating || body.confirmed === true) return null;
+
+  return {
+    ok: false,
+    error: "Confirm this mutating Kubernetes operation before running it.",
+    command,
+    mutating: true,
+    confirmationRequired: true
+  };
 }
 
 function publicClusterSnapshot(snapshot) {
@@ -241,5 +259,6 @@ if (require.main === module) {
 module.exports = {
   createServer,
   publicClusterSnapshot,
+  requireMutationConfirmation,
   readJson
 };

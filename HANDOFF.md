@@ -74,7 +74,7 @@ kubectl exec deploy/pihole-pihole -- pihole-FTL --config dns.hosts
 |---|---|---|---|---|
 | `home-website` | `ghcr.io/chrischang314/home-website:main` | `projects.lan` (`homewebsite.lan` redirects) | `mac-mini-worker` | Launchpad and public portfolio preview. User-facing links use `.lan`; server-side proxy and status URLs use internal K8s service DNS. |
 | `homebridge` | `homebridge/homebridge:latest` | `homebridge.lan` | `rpi5-control` | Uses `hostNetwork: true` for HomeKit/mDNS reliability. Config path is `/srv/homebridge` on the Pi. |
-| `k8s-management-ui` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | `k8s.lan` | `rpi5-control` | LAN control panel for nodes, containers, deployments, and allowlisted kubectl controls. Uses cluster-scoped RBAC. |
+| `k8s-management-ui` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | `k8s.lan` | `rpi5-control` | LAN control panel for nodes, containers, deployments, and allowlisted kubectl controls. Mutating actions require browser and server-side confirmation; cluster-scoped RBAC remains the enforcement layer. |
 | `k8s-cluster-status` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | internal only | `rpi5-control` | Read-only public-status service for the portfolio `/cluster-status/` proxy. Uses read-only RBAC and sanitized aggregate output. |
 | `local-llm` | `ghcr.io/chrischang314/local-llm/*:main` | `localllm.lan` | `mac-mini-worker` | Backend reaches Ollama on the Mac host through `host.lima.internal:11434`, aliasing to `192.168.5.2`. |
 | `model-railroad-automation` | `ghcr.io/chrischang314/model-railroad-automation/web-control:main` | `modelrailroadautomation.lan` | `railroad-pi3` | Train web server; talks to DCC-EX at `192.168.4.22:2560`. |
@@ -178,6 +178,9 @@ performant.
 
 - Pi-hole hostnames solve naming, not ports. Ingress on `80/443` is what makes
   `http://project.lan/` work without a suffix.
+- The K8s management UI treats confirmation as a guardrail, not authorization:
+  the frontend asks before mutating actions, the API requires `confirmed: true`
+  for mutating requests, and command allowlists/RBAC still enforce what can run.
 - Pi-hole web and Pi-hole DNS should be split: DNS keeps the `LoadBalancer`
   port 53, while web is a ClusterIP routed through ingress.
 - The Mac Mini worker is a Lima VM. Its bridged network must use the active LAN

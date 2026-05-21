@@ -223,12 +223,15 @@ async function submitCommand(event) {
 }
 
 async function runCommand(command) {
+  const details = commandDetails(command);
+  if (!confirmMutation(details)) return;
+
   setBusy(true, "running");
   els.commandOutput.textContent = "";
   try {
     const result = await fetchJson("/api/command", {
       method: "POST",
-      body: JSON.stringify({ command })
+      body: JSON.stringify({ command, confirmed: details.mutating })
     });
     showCommandResult(result);
     if (result.mutating) await refreshCluster();
@@ -240,12 +243,15 @@ async function runCommand(command) {
 }
 
 async function runAction(action, payload) {
+  const details = actionDetails(action, payload);
+  if (!confirmMutation(details)) return;
+
   setBusy(true, "running");
   els.commandOutput.textContent = "";
   try {
     const result = await fetchJson("/api/action", {
       method: "POST",
-      body: JSON.stringify({ action, ...payload })
+      body: JSON.stringify({ action, ...payload, confirmed: details.mutating })
     });
     showCommandResult(result);
     if (result.mutating) await refreshCluster();
@@ -257,12 +263,89 @@ async function runAction(action, payload) {
 }
 
 function showCommandResult(result) {
+  const status = result.ok ? "succeeded" : "failed";
+  const kind = result.mutating ? "mutating" : "read-only";
   const out = [
+    `[${formatTime(new Date().toISOString())}] ${kind} command ${status}`,
     `$ ${result.command}`,
     result.stdout || "",
     result.stderr ? `[stderr]\n${result.stderr}` : ""
   ].filter(Boolean).join("\n");
   els.commandOutput.textContent = out;
+}
+
+function confirmMutation(details) {
+  if (!details.mutating) return true;
+
+  return window.confirm([
+    "Confirm Kubernetes mutation",
+    `Command: ${details.command}`,
+    `Impact: ${details.impact}`,
+    "This sends a mutating request to the cluster."
+  ].join("\n\n"));
+}
+
+function commandDetails(command) {
+  const text = String(command || "").trim();
+  const parts = text.split(/\s+/);
+  const verb = parts[1] || "";
+  const subcommand = parts[2] || "";
+  const mutating =
+    ["cordon", "drain", "scale", "uncordon"].includes(verb) ||
+    (verb === "rollout" && subcommand === "restart");
+
+  return {
+    command: text,
+    impact: mutating ? "Typed kubectl mutation" : "Read-only kubectl command",
+    mutating
+  };
+}
+
+function actionDetails(action, payload = {}) {
+  switch (action) {
+    case "cordon-node":
+      return {
+        command: `kubectl cordon ${payload.nodeName}`,
+        impact: `Mark node ${payload.nodeName} unschedulable`,
+        mutating: true
+      };
+    case "uncordon-node":
+      return {
+        command: `kubectl uncordon ${payload.nodeName}`,
+        impact: `Allow scheduling on node ${payload.nodeName}`,
+        mutating: true
+      };
+    case "restart-deployment":
+      return {
+        command: `kubectl rollout restart deployment/${payload.name} -n ${payload.namespace || "default"}`,
+        impact: `Restart deployment ${payload.namespace || "default"}/${payload.name}`,
+        mutating: true
+      };
+    case "scale-deployment":
+      return {
+        command: `kubectl scale deployment/${payload.name} -n ${payload.namespace || "default"} --replicas=${payload.replicas}`,
+        impact: `Scale deployment ${payload.namespace || "default"}/${payload.name} to ${payload.replicas} replicas`,
+        mutating: true
+      };
+    case "describe-node":
+      return {
+        command: `kubectl describe node ${payload.nodeName}`,
+        impact: `Read node ${payload.nodeName} details`,
+        mutating: false
+      };
+    case "rollout-status":
+      return {
+        command: `kubectl rollout status deployment/${payload.name} -n ${payload.namespace || "default"}`,
+        impact: `Read rollout status for ${payload.namespace || "default"}/${payload.name}`,
+        mutating: false
+      };
+    default:
+      return {
+        command: action,
+        impact: "Unknown action",
+        mutating: false
+      };
+  }
 }
 
 async function fetchJson(url, options = {}) {
