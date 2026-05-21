@@ -22,7 +22,7 @@ services:
   # ── API ────────────────────────────────────────────────────────────────────
   - name: api
     image: ghcr.io/chrischang314/recruiting-app/api
-    tag: main
+    tag: public-sources-20260520-2346
     port: 8000
     replicas: 1
     nodeSelector:
@@ -85,7 +85,7 @@ services:
   # ── Scraper daemon ─────────────────────────────────────────────────────────
   - name: scraper
     image: ghcr.io/chrischang314/recruiting-app/scraper
-    tag: onepoint-full-20260520-0218
+    tag: public-sources-20260521-0039
     # No port — daemon only, no HTTP surface.
     replicas: 1
     strategy:
@@ -104,7 +104,7 @@ services:
       - name: HF_HOME
         value: /app/.hf-cache
       - name: SCRAPER_SOURCES
-        value: hackernews,reddit
+        value: geeksforgeeks,code360,stackexchange,devto,nowcoder,hackernews,reddit
       - name: SCRAPER_HEADLESS
         value: "true"
       - name: SCRAPER_STORAGE_STATE_PATH
@@ -145,6 +145,22 @@ services:
         value: "50"
       - name: SCRAPER_HACKERNEWS_LIMIT_PER_QUERY
         value: "100"
+      - name: SCRAPER_STACKEXCHANGE_LIMIT_PER_QUERY
+        value: "10"
+      - name: SCRAPER_STACKEXCHANGE_SITES
+        value: workplace
+      - name: SCRAPER_STACKEXCHANGE_QUERIES
+        value: interview,offer negotiation
+      - name: SCRAPER_DEVTO_LIMIT_PER_TAG
+        value: "30"
+      - name: SCRAPER_GEEKSFORGEEKS_MAX_PAGES
+        value: "3"
+      - name: SCRAPER_CODE360_PAGES
+        value: "3"
+      - name: SCRAPER_CODE360_LIMIT_PER_PAGE
+        value: "50"
+      - name: SCRAPER_NOWCODER_LIMIT
+        value: "50"
 
     resources:
       requests:
