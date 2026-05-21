@@ -45,6 +45,120 @@ test("server exposes health, cluster, and command endpoints", async () => {
   }
 });
 
+test("server requires confirmation before mutating command execution", async () => {
+  const calls = [];
+  const server = createServer({
+    env: { K8S_UI_DEMO: "true", K8S_UI_ALLOW_MUTATIONS: "true" },
+    client: {
+      mode: "test",
+      async snapshot() {
+        return mapClusterSnapshot(demoRawCluster(), new Date("2026-05-17T12:00:00Z"));
+      }
+    },
+    async commandRunner(command) {
+      calls.push(command);
+      return {
+        ok: true,
+        code: 0,
+        command,
+        stdout: "ok",
+        stderr: "",
+        mutating: true
+      };
+    }
+  });
+
+  await listen(server);
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+
+    const blocked = await postJson(`${base}/api/command`, { command: "kubectl cordon mac-mini-worker" }, 409);
+    assert.equal(blocked.requiresConfirmation, true);
+    assert.equal(blocked.command, "kubectl cordon mac-mini-worker");
+    assert.deepEqual(calls, []);
+
+    const confirmed = await postJson(`${base}/api/command`, {
+      command: "kubectl cordon mac-mini-worker",
+      confirmed: true
+    });
+    assert.equal(confirmed.ok, true);
+    assert.deepEqual(calls, ["kubectl cordon mac-mini-worker"]);
+  } finally {
+    await close(server);
+  }
+});
+
+test("server requires confirmation before mutating built-in actions", async () => {
+  const calls = [];
+  const server = createServer({
+    env: { K8S_UI_DEMO: "true", K8S_UI_ALLOW_MUTATIONS: "true" },
+    client: {
+      mode: "test",
+      async snapshot() {
+        return mapClusterSnapshot(demoRawCluster(), new Date("2026-05-17T12:00:00Z"));
+      }
+    },
+    async commandRunner(command) {
+      calls.push(command);
+      return {
+        ok: true,
+        code: 0,
+        command,
+        stdout: "ok",
+        stderr: "",
+        mutating: true
+      };
+    }
+  });
+
+  await listen(server);
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+
+    const blocked = await postJson(`${base}/api/action`, {
+      action: "restart-deployment",
+      namespace: "default",
+      name: "k8s-management-ui-web"
+    }, 409);
+    assert.equal(blocked.requiresConfirmation, true);
+    assert.equal(blocked.command, "kubectl rollout restart deployment/k8s-management-ui-web -n default");
+    assert.deepEqual(calls, []);
+
+    await postJson(`${base}/api/action`, {
+      action: "restart-deployment",
+      namespace: "default",
+      name: "k8s-management-ui-web",
+      confirmed: true
+    });
+    assert.deepEqual(calls, ["kubectl rollout restart deployment/k8s-management-ui-web -n default"]);
+  } finally {
+    await close(server);
+  }
+});
+
+test("server reports disabled mutations without asking for confirmation", async () => {
+  const server = createServer({
+    env: { K8S_UI_DEMO: "true", K8S_UI_ALLOW_MUTATIONS: "false" },
+    client: {
+      mode: "test",
+      async snapshot() {
+        return mapClusterSnapshot(demoRawCluster(), new Date("2026-05-17T12:00:00Z"));
+      }
+    }
+  });
+
+  await listen(server);
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const result = await postJson(`${base}/api/command`, { command: "kubectl cordon mac-mini-worker" }, 400);
+
+    assert.equal(result.requiresConfirmation, undefined);
+    assert.match(result.stderr, /disabled/);
+  } finally {
+    await close(server);
+  }
+});
+
 test("public status mode serves sanitized cluster data and blocks controls", async () => {
   const server = createServer({
     env: {

@@ -3,7 +3,8 @@
 const state = {
   snapshot: null,
   selectedNode: null,
-  busy: false
+  busy: false,
+  pendingConfirmation: null
 };
 
 const els = {
@@ -20,7 +21,14 @@ const els = {
   commandOutput: document.getElementById("commandOutput"),
   commandState: document.getElementById("commandState"),
   refreshButton: document.getElementById("refreshButton"),
-  runCommandButton: document.getElementById("runCommandButton")
+  runCommandButton: document.getElementById("runCommandButton"),
+  confirmationBackdrop: document.getElementById("confirmationBackdrop"),
+  confirmationTitle: document.getElementById("confirmationTitle"),
+  confirmationMode: document.getElementById("confirmationMode"),
+  confirmationImpact: document.getElementById("confirmationImpact"),
+  confirmationCommand: document.getElementById("confirmationCommand"),
+  cancelConfirmationButton: document.getElementById("cancelConfirmationButton"),
+  confirmExecutionButton: document.getElementById("confirmExecutionButton")
 };
 
 async function refreshCluster() {
@@ -222,13 +230,23 @@ async function submitCommand(event) {
   await runCommand(els.commandInput.value);
 }
 
-async function runCommand(command) {
+async function runCommand(command, options = {}) {
+  const detail = commandDetail(command);
+  if (detail.mutating && !options.confirmed) {
+    return showConfirmation({
+      title: "Confirm Command",
+      impact: "Typed command changes cluster state.",
+      command: detail.command,
+      onConfirm: () => runCommand(command, { confirmed: true })
+    });
+  }
+
   setBusy(true, "running");
   els.commandOutput.textContent = "";
   try {
     const result = await fetchJson("/api/command", {
       method: "POST",
-      body: JSON.stringify({ command })
+      body: JSON.stringify({ command, confirmed: options.confirmed === true })
     });
     showCommandResult(result);
     if (result.mutating) await refreshCluster();
@@ -239,13 +257,23 @@ async function runCommand(command) {
   }
 }
 
-async function runAction(action, payload) {
+async function runAction(action, payload, options = {}) {
+  const detail = actionDetail(action, payload);
+  if (detail.mutating && !options.confirmed) {
+    return showConfirmation({
+      title: "Confirm Action",
+      impact: detail.impact,
+      command: detail.command,
+      onConfirm: () => runAction(action, payload, { confirmed: true })
+    });
+  }
+
   setBusy(true, "running");
   els.commandOutput.textContent = "";
   try {
     const result = await fetchJson("/api/action", {
       method: "POST",
-      body: JSON.stringify({ action, ...payload })
+      body: JSON.stringify({ action, ...payload, confirmed: options.confirmed === true })
     });
     showCommandResult(result);
     if (result.mutating) await refreshCluster();
@@ -259,10 +287,99 @@ async function runAction(action, payload) {
 function showCommandResult(result) {
   const out = [
     `$ ${result.command}`,
+    `receipt: ${result.ok ? "completed" : "failed"} | ${result.mutating ? "mutating" : "read-only"} | code ${result.code}`,
     result.stdout || "",
     result.stderr ? `[stderr]\n${result.stderr}` : ""
   ].filter(Boolean).join("\n");
   els.commandOutput.textContent = out;
+}
+
+function showConfirmation(detail) {
+  state.pendingConfirmation = detail;
+  els.confirmationTitle.textContent = detail.title;
+  els.confirmationMode.textContent = "mutating";
+  els.confirmationImpact.textContent = detail.impact;
+  els.confirmationCommand.textContent = detail.command;
+  els.confirmationBackdrop.classList.remove("hidden");
+  els.confirmExecutionButton.focus();
+}
+
+function clearConfirmation() {
+  state.pendingConfirmation = null;
+  els.confirmationBackdrop.classList.add("hidden");
+}
+
+async function confirmPendingExecution() {
+  const pending = state.pendingConfirmation;
+  if (!pending) return;
+  clearConfirmation();
+  await pending.onConfirm();
+}
+
+function actionDetail(action, payload = {}) {
+  const namespace = payload.namespace || "default";
+  const nodeName = payload.nodeName || "";
+  const name = payload.name || "";
+  switch (action) {
+    case "describe-node":
+      return {
+        mutating: false,
+        command: `kubectl describe node ${nodeName}`,
+        impact: `Read node ${nodeName}.`
+      };
+    case "cordon-node":
+      return {
+        mutating: true,
+        command: `kubectl cordon ${nodeName}`,
+        impact: `Mark node ${nodeName} unschedulable.`
+      };
+    case "uncordon-node":
+      return {
+        mutating: true,
+        command: `kubectl uncordon ${nodeName}`,
+        impact: `Allow new workloads on node ${nodeName}.`
+      };
+    case "restart-deployment":
+      return {
+        mutating: true,
+        command: `kubectl rollout restart deployment/${name} -n ${namespace}`,
+        impact: `Restart deployment ${namespace}/${name}.`
+      };
+    case "rollout-status":
+      return {
+        mutating: false,
+        command: `kubectl rollout status deployment/${name} -n ${namespace}`,
+        impact: `Read rollout status for ${namespace}/${name}.`
+      };
+    case "scale-deployment":
+      return {
+        mutating: true,
+        command: `kubectl scale deployment/${name} -n ${namespace} --replicas=${payload.replicas}`,
+        impact: `Scale deployment ${namespace}/${name} to ${payload.replicas} replicas.`
+      };
+    default:
+      return {
+        mutating: false,
+        command: action,
+        impact: "Run selected action."
+      };
+  }
+}
+
+function commandDetail(command) {
+  const clean = String(command || "").trim();
+  const parts = clean.split(/\s+/);
+  const verb = parts[0] === "kubectl" ? parts[1] : "";
+  const subcommand = parts[2];
+  const mutating =
+    ["cordon", "drain", "scale", "uncordon"].includes(verb) ||
+    (verb === "rollout" && subcommand === "restart");
+
+  return {
+    mutating,
+    command: clean,
+    impact: mutating ? "Change cluster state." : "Read cluster state."
+  };
 }
 
 async function fetchJson(url, options = {}) {
@@ -285,6 +402,7 @@ function setBusy(busy, label) {
   els.commandState.textContent = label;
   els.refreshButton.disabled = busy;
   els.runCommandButton.disabled = busy;
+  els.confirmExecutionButton.disabled = busy;
   document.querySelectorAll("[data-action]").forEach((button) => {
     button.disabled = busy;
   });
@@ -317,6 +435,11 @@ function escapeAttr(value) {
 
 els.refreshButton.addEventListener("click", refreshCluster);
 els.commandForm.addEventListener("submit", submitCommand);
+els.cancelConfirmationButton.addEventListener("click", clearConfirmation);
+els.confirmExecutionButton.addEventListener("click", confirmPendingExecution);
+els.confirmationBackdrop.addEventListener("click", (event) => {
+  if (event.target === els.confirmationBackdrop) clearConfirmation();
+});
 els.nodeMap.addEventListener("click", (event) => {
   const button = event.target.closest("[data-action]");
   if (button) {

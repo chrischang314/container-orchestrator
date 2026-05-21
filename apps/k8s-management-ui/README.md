@@ -16,10 +16,14 @@ and in-cluster service-account environment variables are present.
 - `GET /api/cluster` reads nodes, pods, containers, and deployments through the
   Kubernetes API.
 - `POST /api/action` runs built-in node and deployment controls through a
-  validated `kubectl` invocation.
+  validated `kubectl` invocation. Mutating actions require a UI confirmation
+  and a backend `confirmed: true` receipt before execution.
 - `POST /api/command` accepts allowlisted `kubectl` commands. Shell operators,
   kubeconfig overrides, token overrides, and arbitrary verbs are rejected before
-  execution.
+  execution. Typed mutating commands such as `cordon`, `uncordon`, `scale`, and
+  `rollout restart` require confirmation before the backend runs them.
+- Mutating results render a receipt with the exact command, mutating/read-only
+  classification, exit code, stdout, and stderr.
 
 ## Public status mode
 

@@ -216,5 +216,10 @@ repository before Keel rolls the UI in-cluster. The same image also powers the
 internal `k8s-cluster-status` read-only service used by the public portfolio's
 `/cluster-status/` proxy.
 
+The LAN `k8s-management-ui` requires an explicit confirmation step for
+mutating cluster actions and typed mutating `kubectl` commands. The backend
+also rejects unconfirmed mutations, so the dialog is an operator-safety layer on
+top of server-side enforcement.
+
 When you go public, the polling can be replaced by a webhook from Actions for
 near-instant deploys.

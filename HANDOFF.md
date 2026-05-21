@@ -74,7 +74,7 @@ kubectl exec deploy/pihole-pihole -- pihole-FTL --config dns.hosts
 |---|---|---|---|---|
 | `home-website` | `ghcr.io/chrischang314/home-website:main` | `projects.lan` (`homewebsite.lan` redirects) | `mac-mini-worker` | Launchpad and public portfolio preview. User-facing links use `.lan`; server-side proxy and status URLs use internal K8s service DNS. |
 | `homebridge` | `homebridge/homebridge:latest` | `homebridge.lan` | `rpi5-control` | Uses `hostNetwork: true` for HomeKit/mDNS reliability. Config path is `/srv/homebridge` on the Pi. |
-| `k8s-management-ui` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | `k8s.lan` | `rpi5-control` | LAN control panel for nodes, containers, deployments, and allowlisted kubectl controls. Uses cluster-scoped RBAC. |
+| `k8s-management-ui` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | `k8s.lan` | `rpi5-control` | LAN control panel for nodes, containers, deployments, and allowlisted kubectl controls. Mutating controls require UI confirmation and backend `confirmed: true` before execution. Uses cluster-scoped RBAC. |
 | `k8s-cluster-status` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | internal only | `rpi5-control` | Read-only public-status service for the portfolio `/cluster-status/` proxy. Uses read-only RBAC and sanitized aggregate output. |
 | `local-llm` | `ghcr.io/chrischang314/local-llm/*:main` | `localllm.lan` | `mac-mini-worker` | Backend reaches Ollama on the Mac host through `host.lima.internal:11434`, aliasing to `192.168.5.2`. |
 | `model-railroad-automation` | `ghcr.io/chrischang314/model-railroad-automation/web-control:main` | `modelrailroadautomation.lan` | `railroad-pi3` | Train web server; talks to DCC-EX at `192.168.4.22:2560`. |
@@ -223,3 +223,10 @@ curl.exe -I http://projects.lan/cluster-status/
 ## Agent Operating Policy
 
 Project-specific Codex rules now live in `AGENTS.md`. Use them before adding worker nodes or deploying containers. The important rule is simple: after any deployment, verify Helm lint, rollout status, pod health/logs when needed, and the LAN or health endpoint before calling the work complete.
+
+## Pending Feature Candidate
+
+Implementer C branch `projects-lan-implementer-c-2026-05-21-k8s-confirmation`
+adds a confirmation gate and execution receipts for mutating
+`k8s-management-ui` actions. It is pushed for judge comparison only and has not
+been merged or deployed.

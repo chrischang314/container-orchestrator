@@ -77,6 +77,21 @@
           </div>
         </section>
       </main>
+
+      <div id="confirmationBackdrop" class="confirmation-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="confirmationTitle">
+        <div class="confirmation-dialog">
+          <div class="section-heading">
+            <h2 id="confirmationTitle">Confirm Command</h2>
+            <span id="confirmationMode">mutating</span>
+          </div>
+          <p id="confirmationImpact" class="confirmation-impact"></p>
+          <pre id="confirmationCommand" class="confirmation-command"></pre>
+          <div class="confirmation-actions">
+            <button id="cancelConfirmationButton" type="button">Cancel</button>
+            <button id="confirmExecutionButton" type="button" class="danger-button">Confirm Run</button>
+          </div>
+        </div>
+      </div>
     </div>
   </body>
 </html>
