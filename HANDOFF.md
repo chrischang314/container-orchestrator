@@ -224,9 +224,10 @@ curl.exe -I http://projects.lan/cluster-status/
 
 Project-specific Codex rules now live in `AGENTS.md`. Use them before adding worker nodes or deploying containers. The important rule is simple: after any deployment, verify Helm lint, rollout status, pod health/logs when needed, and the LAN or health endpoint before calling the work complete.
 
-## Pending Feature Candidate
+## K8s UI Mutation Safety
 
-Implementer C branch `projects-lan-implementer-c-2026-05-21-k8s-confirmation`
-adds a confirmation gate and execution receipts for mutating
-`k8s-management-ui` actions. It is pushed for judge comparison only and has not
-been merged or deployed.
+The LAN `k8s-management-ui` requires a confirmation dialog before built-in
+mutating actions or typed mutating `kubectl` commands send a network request.
+The backend also rejects unconfirmed mutating `/api/action` and `/api/command`
+calls with HTTP 409, while read-only controls stay one-click. Receipts show the
+exact command, mutating/read-only classification, exit code, stdout, and stderr.
