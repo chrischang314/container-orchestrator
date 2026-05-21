@@ -51,7 +51,7 @@ numbers:
 
 | URL | Workload | Placement |
 |---|---|---|
-| `http://homewebsite.lan/` | Homelab launchpad and portfolio preview | Mac Mini worker |
+| `http://projects.lan/` | Homelab launchpad and portfolio preview. `homewebsite.lan` redirects here. | Mac Mini worker |
 | `http://homebridge.lan/` | Homebridge UI | Raspberry Pi 5 control plane |
 | `http://k8s.lan/` | Kubernetes cluster management UI | Raspberry Pi 5 control plane |
 | `http://localllm.lan/` | Local LLM chat frontend | Mac Mini worker |
@@ -107,6 +107,10 @@ because each pod runs the full scheduler.
    hostnames like `recruitingapp.lan` and `modeltradingbot.lan`. Visit
    `http://<host>` with no port number; ingress-nginx owns the normal web
    ports `80/443`.
+
+For `home-website`, keep browser-facing app links on the `.lan` names but set
+server-side proxy and health URLs to Kubernetes service DNS in
+`apps/home-website/values.yaml`. Pods cannot rely on Pi-hole-only hostnames.
 
 ## Repo layout
 

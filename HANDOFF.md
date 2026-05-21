@@ -72,7 +72,7 @@ kubectl exec deploy/pihole-pihole -- pihole-FTL --config dns.hosts
 
 | App | Repo/image | LAN URL | Placement | Notes |
 |---|---|---|---|---|
-| `home-website` | `ghcr.io/chrischang314/home-website:main` | `homewebsite.lan` | `mac-mini-worker` | Launchpad and public portfolio preview. User-facing links use `.lan`; status probes use internal K8s service DNS. |
+| `home-website` | `ghcr.io/chrischang314/home-website:main` | `projects.lan` (`homewebsite.lan` redirects) | `mac-mini-worker` | Launchpad and public portfolio preview. User-facing links use `.lan`; server-side proxy and status URLs use internal K8s service DNS. |
 | `homebridge` | `homebridge/homebridge:latest` | `homebridge.lan` | `rpi5-control` | Uses `hostNetwork: true` for HomeKit/mDNS reliability. Config path is `/srv/homebridge` on the Pi. |
 | `k8s-management-ui` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | `k8s.lan` | `rpi5-control` | LAN control panel for nodes, containers, deployments, and allowlisted kubectl controls. Uses cluster-scoped RBAC. |
 | `k8s-cluster-status` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | internal only | `rpi5-control` | Read-only public-status service for the portfolio `/cluster-status/` proxy. Uses read-only RBAC and sanitized aggregate output. |
@@ -185,9 +185,9 @@ performant.
   `/Users/chrischang/.lima/_config/networks.yaml`.
 - K3s pod DNS on the Lima worker depends on a sane resolver file. The working
   setup uses K3S_RESOLV_CONF with `/run/systemd/resolve/resolv.conf`.
-- The home website server runs inside Kubernetes, so its health checks cannot
-  rely on Pi-hole `.lan` DNS. It uses internal service DNS for probes and `.lan`
-  URLs for links.
+- The home website server runs inside Kubernetes, so its health checks and
+  proxied demo routes cannot rely on Pi-hole `.lan` DNS. It uses internal
+  service DNS for probes/proxies and `.lan` URLs for user-facing links.
 - Homebridge uses host networking because HomeKit discovery depends on LAN
   multicast/mDNS.
 - Railroad control is intentionally placed on the Pi near the train hardware.
@@ -211,6 +211,14 @@ helm upgrade --install home-website charts/app \
 
 # Check a rollout.
 kubectl rollout status deployment/home-website-web --timeout=120s
+
+# Check the launchpad and proxied public-preview routes.
+curl.exe -I http://projects.lan/
+curl.exe -I http://projects.lan/model-trading-bot/
+curl.exe -I http://projects.lan/trading-bot/
+curl.exe -I http://projects.lan/local-llm/
+curl.exe -I http://projects.lan/railroad-automation/
+curl.exe -I http://projects.lan/cluster-status/
 ```
 ## Agent Operating Policy
 

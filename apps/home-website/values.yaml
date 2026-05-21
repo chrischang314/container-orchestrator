@@ -40,8 +40,18 @@ services:
       - name: K8S_MANAGEMENT_URL
         value: http://k8s.lan/
 
-      # User-facing links stay on Pi-hole `.lan` names. The server-side status
-      # probes run inside Kubernetes, where service DNS is authoritative.
+      # User-facing links stay on Pi-hole `.lan` names. Server-side proxies and
+      # status probes run inside Kubernetes, where service DNS is authoritative.
+      - name: MODEL_TRADING_BOT_PROXY_URL
+        value: http://model-trading-bot-frontend.default.svc.cluster.local:14000
+      - name: TRADING_BOT_PROXY_URL
+        value: http://trading-bot.trading-bot.svc.cluster.local
+      - name: LOCAL_LLM_PROXY_URL
+        value: http://local-llm-frontend.default.svc.cluster.local:12000
+      - name: MODEL_RAILROAD_PROXY_URL
+        value: http://model-railroad-automation-web-control.default.svc.cluster.local:15000
+      - name: K8S_CLUSTER_STATUS_PROXY_URL
+        value: http://k8s-cluster-status-web.default.svc.cluster.local
       - name: MODEL_RAILROAD_HEALTH_URL
         value: http://model-railroad-automation-web-control.default.svc.cluster.local:15000/health
       - name: TRADING_BOT_UI_HEALTH_URL
