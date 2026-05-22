@@ -1,0 +1,65 @@
+# Read-only public cluster status dashboard.
+namespace: default
+nameOverride: k8s-cluster-status
+
+imagePullSecrets:
+  - name: ghcr-creds
+
+serviceAccount:
+  create: true
+  name: k8s-cluster-status
+
+rbac:
+  create: true
+  clusterRoleName: k8s-cluster-status
+  rules:
+    - apiGroups: [""]
+      resources: ["nodes", "nodes/status", "namespaces", "pods", "services", "endpoints", "events"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: ["apps"]
+      resources: ["deployments", "replicasets", "daemonsets", "statefulsets"]
+      verbs: ["get", "list", "watch"]
+
+services:
+  - name: web
+    image: ghcr.io/chrischang314/container-orchestrator/k8s-management-ui
+    tag: main
+    port: 80
+    containerPort: 8080
+    replicas: 1
+    nodeSelector:
+      kubernetes.io/hostname: rpi5-control
+    autoDeploy:
+      enabled: true
+      pollSchedule: "@every 5m"
+    env:
+      - name: PORT
+        value: "8080"
+      - name: K8S_UI_ALLOW_MUTATIONS
+        value: "false"
+      - name: K8S_UI_PUBLIC_STATUS
+        value: "true"
+      - name: K8S_UI_DEMO
+        value: "false"
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 256Mi
+    probes:
+      readiness:
+        httpGet:
+          path: /api/health
+          port: 8080
+        initialDelaySeconds: 5
+        periodSeconds: 10
+      liveness:
+        httpGet:
+          path: /api/health
+          port: 8080
+        initialDelaySeconds: 15
+        periodSeconds: 20
+
+ingress:
+  enabled: false

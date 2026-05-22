@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cluster Status</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/public-status.js" defer></script>
+  </head>
+  <body class="public-status">
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">container-orchestrator</p>
+          <h1>Kubernetes Cluster Status</h1>
+        </div>
+        <div class="toolbar">
+          <span class="cluster-mode" data-testid="cluster-mode">connecting</span>
+          <button class="icon-button" id="refreshButton" type="button" title="Refresh cluster state" aria-label="Refresh cluster state">Refresh</button>
+        </div>
+      </header>
+
+      <main>
+        <section class="summary-strip" id="summaryStrip" data-testid="summary-strip" aria-live="polite"></section>
+
+        <section class="public-status-grid">
+          <article class="topology-panel">
+            <div class="section-heading">
+              <h2>Node Health</h2>
+              <span id="lastUpdated">--</span>
+            </div>
+            <div class="public-node-list" id="nodeList"></div>
+          </article>
+
+          <article class="details-panel">
+            <div class="section-heading">
+              <h2>Namespace Readiness</h2>
+              <span id="namespaceCount">--</span>
+            </div>
+            <div class="table-wrap">
+              <table class="status-table">
+                <thead>
+                  <tr>
+                    <th>Namespace</th>
+                    <th>Pods</th>
+                    <th>Deployments</th>
+                    <th>Replicas</th>
+                    <th>Restarts</th>
+                  </tr>
+                </thead>
+                <tbody id="namespaceRows"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

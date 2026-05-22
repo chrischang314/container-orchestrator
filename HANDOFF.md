@@ -1,7 +1,7 @@
 # Kubernetes Cluster Handoff
 
 This is the operator handoff for the active home Kubernetes cluster as of
-2026-05-16. It is written for another LLM or human operator taking over the
+2026-05-18. It is written for another LLM or human operator taking over the
 same Mac Mini / Raspberry Pi / Synology homelab.
 
 ## Current Cluster
@@ -39,6 +39,7 @@ cluster ingress address:
 | `projects.lan` | `http://projects.lan/` |
 | `homewebsite.lan` | redirects to `http://projects.lan/` |
 | `homebridge.lan` | `http://homebridge.lan/` |
+| `k8s.lan` | `http://k8s.lan/` |
 | `localllm.lan` | `http://localllm.lan/` |
 | `modelrailroadautomation.lan` | `http://modelrailroadautomation.lan/` |
 | `modeltradingbot.lan` | `http://modeltradingbot.lan/` |
@@ -74,12 +75,14 @@ kubectl exec deploy/pihole-pihole -- pihole-FTL --config dns.hosts
 |---|---|---|---|---|
 | `home-website` | `ghcr.io/chrischang314/home-website:main` | `projects.lan` | `mac-mini-worker` | Launchpad and public portfolio preview. `homewebsite.lan` redirects here. User-facing links use `.lan`; status probes use internal K8s service DNS. |
 | `homebridge` | `homebridge/homebridge:latest` | `homebridge.lan` | `rpi5-control` | Uses `hostNetwork: true` for HomeKit/mDNS reliability. Config path is `/srv/homebridge` on the Pi. |
+| `k8s-management-ui` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | `k8s.lan` | `rpi5-control` | LAN control panel for nodes, containers, deployments, and allowlisted kubectl controls. Uses cluster-scoped RBAC. |
+| `k8s-cluster-status` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | internal only | `rpi5-control` | Read-only public-status service for the portfolio `/cluster-status/` proxy. Uses read-only RBAC and sanitized aggregate output. |
 | `local-llm` | `ghcr.io/chrischang314/local-llm/*:main` | `localllm.lan` | `mac-mini-worker` | Backend reaches Ollama on the Mac host through `host.lima.internal:11434`, aliasing to `192.168.5.2`. |
 | `model-railroad-automation` | `ghcr.io/chrischang314/model-railroad-automation/web-control:main` | `modelrailroadautomation.lan` | `railroad-pi3` | Train web server; talks to DCC-EX at `192.168.4.22:2560`. |
 | `model-trading-bot` | `ghcr.io/chrischang314/model-trading-bot/*:main` | `modeltradingbot.lan` | `mac-mini-worker` | Frontend plus backend with local data PVC. |
 | `pihole` | `pihole/pihole:latest` | `pihole.lan` | `rpi5-control` | DNS on port 53, web via ingress. Config paths are `/srv/pihole/etc-pihole` and `/srv/pihole/etc-dnsmasq.d`. |
 | `postgres` | `pgvector/pgvector:pg16` | internal only | `mac-mini-worker` | Shared PostgreSQL/pgvector database for recruiting app. |
-| `recruiting-app` | `ghcr.io/chrischang314/recruiting-app/*:main` | `recruitingapp.lan` | `mac-mini-worker` | API, frontend, scraper. Scraper is in preview mode without requiring 1point3acres auth. |
+| `recruiting-app` | `ghcr.io/chrischang314/recruiting-app/*:main` | `recruitingapp.lan` | `mac-mini-worker` | API, frontend, scraper. 1point3acres requires a copied `data/storage_state.json`, but it is disabled while the current session returns `user_banned` / "用户组: 不准访问". Active scraper sources are Hacker News + Reddit with embeddings/OCR enabled and a faster public-source profile. |
 | `csb1-ota-updater` | `ghcr.io/chrischang314/model-railroad-csb1-updater:latest` | none | `railroad-pi3` | Runs in namespace `railroad`; used for train hardware support. |
 
 Legacy LoadBalancer service ports still exist for compatibility:
@@ -226,7 +229,7 @@ move later if the NAS proves reliable and performant.
 
 ```sh
 # Verify all main app hostnames from a client using Pi-hole DNS.
-for h in projects homebridge localllm modelrailroadautomation modeltradingbot pihole recruitingapp; do
+for h in projects homeassistant homebridge k8s localllm modelrailroadautomation modeltradingbot pihole recruitingapp; do
   curl -I --max-time 5 "http://${h}.lan/" | sed -n "1p"
 done
 
@@ -242,3 +245,6 @@ kubectl rollout status deployment/home-website-web --timeout=120s
 kubectl get sc synology-nfs
 kubectl get pods -n storage -o wide
 ```
+## Agent Operating Policy
+
+Project-specific Codex rules now live in `AGENTS.md`. Use them before adding worker nodes or deploying containers. The important rule is simple: after any deployment, verify Helm lint, rollout status, pod health/logs when needed, and the LAN or health endpoint before calling the work complete.

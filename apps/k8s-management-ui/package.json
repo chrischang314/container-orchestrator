@@ -1,0 +1,14 @@
+{
+  "name": "k8s-management-ui",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LAN management UI for the container-orchestrator Kubernetes cluster.",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

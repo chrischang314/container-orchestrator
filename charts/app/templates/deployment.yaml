@@ -35,6 +35,9 @@ spec:
       labels:
         {{- include "app.selectorLabels" (dict "root" $ "service" $svc) | nindent 8 }}
     spec:
+      {{- if or $.Values.serviceAccount.create $.Values.serviceAccount.name }}
+      serviceAccountName: {{ include "app.serviceAccountName" $ }}
+      {{- end }}
       {{- if $svc.hostNetwork }}
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet

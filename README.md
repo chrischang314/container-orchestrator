@@ -3,6 +3,8 @@
 Self-hosted Kubernetes platform for running containerized GitHub apps on a Mac
 Mini, with automatic image-driven deployments from GHCR.
 
+Project-specific Codex operating rules live in [`AGENTS.md`](AGENTS.md). Use them for adding worker nodes, deploying app containers, and verifying health after rollout.
+
 For a point-in-time operator handoff with current nodes, URLs, storage, and
 migration notes, see [`HANDOFF.md`](HANDOFF.md).
 
@@ -50,7 +52,9 @@ numbers:
 | URL | Workload | Placement |
 |---|---|---|
 | `http://projects.lan/` | Homelab launchpad and portfolio preview | Mac Mini worker |
+| `http://homeassistant.lan/` | Home Assistant UI | Raspberry Pi 5 control plane |
 | `http://homebridge.lan/` | Homebridge UI | Raspberry Pi 5 control plane |
+| `http://k8s.lan/` | Kubernetes cluster management UI | Raspberry Pi 5 control plane |
 | `http://localllm.lan/` | Local LLM chat frontend | Mac Mini worker |
 | `http://modelrailroadautomation.lan/` | Railroad control web server | Railroad Pi worker |
 | `http://modeltradingbot.lan/` | Trading bot frontend | Mac Mini worker |
@@ -63,6 +67,20 @@ through the `.lan` ingress hostnames above.
 
 `http://homewebsite.lan/` is kept as a compatibility alias and redirects to
 `http://projects.lan/`.
+
+Recruiting app note: the scraper now requires a copied
+`data/storage_state.json` for authenticated 1point3acres access. It uses the
+Discuz mobile JSON endpoint plus rendered-page enrichment, with embeddings and
+OCR enabled so full-post text, replies, images, and OCR move into the searchable
+pipeline after the full-content rebuild. If the session returns `user_banned`
+or "用户组: 不准访问", keep scraper replicas at 0 until a permitted
+`storage_state.json` is copied into the scraper PVC.
+
+While 1point3acres is blocked, the deployed scraper runs Hacker News + Reddit
+only with a faster public-source profile: 6 configured in-flight requests,
+1-2 seconds between request starts, 100 Hacker News results per query, 50
+Reddit results per query, and a 1-hour crawl interval. Keep replicas at 1
+because each pod runs the full scheduler.
 
 ## Day-1 setup, end to end
 
@@ -105,6 +123,7 @@ platform/
     synology-nfs-provisioner/  Helm values for Synology-backed PVCs
 charts/app/                generic reusable Helm chart for an "app"
 apps/<name>/values.yaml    per-app config consumed by charts/app
+.github/workflows/         in-repo image builds, including k8s-management-ui
 ci/templates/              drop-in GitHub Actions workflow for app repos
 scripts/                   deploy / status / switch-cluster
 ```
@@ -203,6 +222,12 @@ a node selector or deleting PVCs in place.
 2. [Keel](https://keel.sh) polls GHCR every 5 minutes. When `:main`'s digest
    changes, Keel triggers a rolling update of the matching Deployment.
 3. Stateful pods retain their PVCs across the rollout.
+
+The in-repo `k8s-management-ui` workflow builds and pushes
+`ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` from this
+repository before Keel rolls the UI in-cluster. The same image also powers the
+internal `k8s-cluster-status` read-only service used by the public portfolio's
+`/cluster-status/` proxy.
 
 When you go public, the polling can be replaced by a webhook from Actions for
 near-instant deploys.
