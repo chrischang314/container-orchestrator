@@ -15,8 +15,8 @@ migration notes, see [`HANDOFF.md`](HANDOFF.md).
 - Apps live in their own GitHub repos. CI builds an image, pushes it to GHCR,
   and the cluster picks it up on its next poll — no manual `kubectl apply`.
 - Stateful apps survive rolling updates (PVCs).
-- LAN-only today; opening to the public is a config flip later (cert-manager
-  is pre-installed but dormant).
+- LAN-first by default, with the public portfolio served through the same
+  ingress-nginx and cert-manager platform.
 
 ## Cluster backends
 
@@ -67,6 +67,17 @@ through the `.lan` ingress hostnames above.
 
 `http://homewebsite.lan/` is kept as a compatibility alias and redirects to
 `http://projects.lan/`.
+
+## Public portfolio
+
+`home-website-public` serves `https://chriswchang.com/` and
+`https://www.chriswchang.com/` from the public `home-website:public` image. It
+also has a hostless HTTP ingress rule so direct public-IP HTTP requests route to
+the portfolio instead of nginx's default 404.
+
+The domain's DNS A record must still point at the current home WAN IP. Run
+`make status` to compare public DNS with the detected WAN IP and verify the
+origin health path.
 
 Recruiting app note: the scraper now requires a copied
 `data/storage_state.json` for authenticated 1point3acres access. It uses the
@@ -229,5 +240,5 @@ repository before Keel rolls the UI in-cluster. The same image also powers the
 internal `k8s-cluster-status` read-only service used by the public portfolio's
 `/cluster-status/` proxy.
 
-When you go public, the polling can be replaced by a webhook from Actions for
-near-instant deploys.
+For faster public deploys, the polling can be replaced by a webhook from
+Actions.

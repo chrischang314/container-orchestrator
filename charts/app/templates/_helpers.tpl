@@ -16,6 +16,18 @@ Per-service resource name: "<app>-<service>". Truncated to 63 chars
 {{- end -}}
 
 {{/*
+Per-service Kubernetes resource name. Defaults to "<app>-<service>", but can be
+overridden when adopting a pre-existing deployment/service naming convention.
+*/}}
+{{- define "app.serviceResourceName" -}}
+{{- if .service.resourceName -}}
+{{- .service.resourceName | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- include "app.serviceFullname" . -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Top-level labels (no per-service component label). Call with a scope where
 .Release and .Values are available — e.g. `{{ include "app.labels" . }}`.
 */}}
@@ -41,9 +53,13 @@ helm.sh/chart: {{ printf "%s-%s" .root.Chart.Name .root.Chart.Version | replace 
 Selector labels (must be stable across upgrades — never include chart/version).
 */}}
 {{- define "app.selectorLabels" -}}
+{{- if .service.selectorLabels -}}
+{{- toYaml .service.selectorLabels -}}
+{{- else -}}
 app.kubernetes.io/name: {{ default .root.Release.Name .root.Values.nameOverride }}
 app.kubernetes.io/instance: {{ .root.Release.Name }}
 app.kubernetes.io/component: {{ .service.name }}
+{{- end -}}
 {{- end -}}
 
 {{/*

@@ -52,6 +52,11 @@ Ingress is `ingress-nginx` with a `LoadBalancer` service on normal web ports:
 - HTTPS: `443`
 - External IPs: `192.168.4.34`, `192.168.4.56`, `192.168.4.57`
 
+The public portfolio is managed by the `home-website-public` Helm release. It
+routes `chriswchang.com`, `www.chriswchang.com`, and unmatched HTTP hosts to
+the sanitized public image. Public DNS is outside the cluster; `make status`
+compares the domain's A record with the current WAN IP.
+
 Pi-hole DNS is exposed separately as a `LoadBalancer` service on TCP/UDP `53`.
 The Pi-hole web UI is a separate ClusterIP service named `pihole-web` and is
 routed through ingress at `pihole.lan`.
@@ -73,7 +78,8 @@ kubectl exec deploy/pihole-pihole -- pihole-FTL --config dns.hosts
 
 | App | Repo/image | LAN URL | Placement | Notes |
 |---|---|---|---|---|
-| `home-website` | `ghcr.io/chrischang314/home-website:main` | `projects.lan` | `mac-mini-worker` | Launchpad and public portfolio preview. `homewebsite.lan` redirects here. User-facing links use `.lan`; status probes use internal K8s service DNS. |
+| `home-website` | `ghcr.io/chrischang314/home-website:main` | `projects.lan` | `mac-mini-worker` | LAN launchpad. `homewebsite.lan` redirects here. User-facing links use `.lan`; status probes use internal K8s service DNS. |
+| `home-website-public` | `ghcr.io/chrischang314/home-website:public` | `chriswchang.com` | `mac-mini-worker` | Public portfolio with TLS via `letsencrypt-http01`; also catches direct public-IP HTTP requests. |
 | `homebridge` | `homebridge/homebridge:latest` | `homebridge.lan` | `rpi5-control` | Uses `hostNetwork: true` for HomeKit/mDNS reliability. Config path is `/srv/homebridge` on the Pi. |
 | `k8s-management-ui` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | `k8s.lan` | `rpi5-control` | LAN control panel for nodes, containers, deployments, and allowlisted kubectl controls. Uses cluster-scoped RBAC. |
 | `k8s-cluster-status` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | internal only | `rpi5-control` | Read-only public-status service for the portfolio `/cluster-status/` proxy. Uses read-only RBAC and sanitized aggregate output. |

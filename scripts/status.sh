@@ -74,3 +74,32 @@ echo
 echo "  Add to /etc/hosts on other devices to reach ingress hosts:"
 FIRST_INGRESS_ADDR="${INGRESS_ADDRS%% *}"
 echo "    ${FIRST_INGRESS_ADDR:-<ingress-address>}   <ingress-host>"
+
+hdr "Public website"
+PUBLIC_HOST="${PUBLIC_HOST:-chriswchang.com}"
+WAN_IP="$(curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null || true)"
+DNS_A="$(dig +short "$PUBLIC_HOST" A 2>/dev/null | xargs || true)"
+AUTH_NS="$(dig +short "$PUBLIC_HOST" NS 2>/dev/null | head -n1 | sed 's/\.$//' || true)"
+if [[ -n "$AUTH_NS" ]]; then
+  AUTH_DNS_A="$(dig @"$AUTH_NS" +short "$PUBLIC_HOST" A 2>/dev/null | xargs || true)"
+else
+  AUTH_DNS_A=""
+fi
+
+echo "  host:          $PUBLIC_HOST"
+echo "  current WAN:   ${WAN_IP:-unknown}"
+echo "  resolver A:    ${DNS_A:-none}"
+echo "  authoritative: ${AUTH_DNS_A:-none}${AUTH_NS:+ ($AUTH_NS)}"
+
+if [[ -n "$WAN_IP" && -n "$AUTH_DNS_A" && " $AUTH_DNS_A " != *" $WAN_IP "* ]]; then
+  echo "  status:        DNS A record does not match current WAN IP"
+elif [[ -n "$WAN_IP" ]]; then
+  HEALTH="$(curl -fsS --max-time 8 --resolve "$PUBLIC_HOST:443:$WAN_IP" "https://$PUBLIC_HOST/api/health" 2>/dev/null || true)"
+  if [[ "$HEALTH" == *'"ok":true'* ]]; then
+    echo "  status:        origin healthy through current WAN IP"
+  else
+    echo "  status:        origin health check failed through current WAN IP"
+  fi
+else
+  echo "  status:        unable to determine current WAN IP"
+fi

@@ -1,0 +1,121 @@
+# Public portfolio site for chriswchang.com.
+namespace: default
+nameOverride: home-website-public
+
+imagePullSecrets:
+  - name: ghcr-creds
+
+services:
+  - name: web
+    resourceName: home-website-public
+    serviceName: home-website-public
+    image: ghcr.io/chrischang314/home-website
+    tag: public
+    port: 80
+    targetPort: 8080
+    containerPort: 8080
+    replicas: 1
+    nodeSelector:
+      kubernetes.io/hostname: mac-mini-worker
+    selectorLabels:
+      app: home-website-public
+    autoDeploy:
+      enabled: true
+      pollSchedule: "@every 5m"
+
+    env:
+      - name: SITE_AUDIENCE
+        value: public
+      - name: PORT
+        value: "8080"
+      - name: MODEL_TRADING_BOT_PROXY_URL
+        value: http://model-trading-bot-frontend.default.svc.cluster.local:14000
+      - name: MODEL_TRADING_BOT_API_PROXY_URL
+        value: http://model-trading-bot-backend.default.svc.cluster.local:8000
+      - name: TRADING_BOT_PROXY_URL
+        value: http://trading-bot.trading-bot.svc.cluster.local
+      - name: LOCAL_LLM_PROXY_URL
+        value: http://local-llm-frontend.default.svc.cluster.local:12000
+      - name: MODEL_RAILROAD_PROXY_URL
+        value: http://model-railroad-automation-web-control.default.svc.cluster.local:15000
+      - name: K8S_CLUSTER_STATUS_PROXY_URL
+        value: http://k8s-cluster-status-web.default.svc.cluster.local
+
+    probes:
+      readiness:
+        httpGet:
+          path: /api/health
+          port: 8080
+        initialDelaySeconds: 5
+        periodSeconds: 10
+      liveness:
+        httpGet:
+          path: /api/health
+          port: 8080
+        initialDelaySeconds: 15
+        periodSeconds: 20
+
+ingress:
+  enabled: true
+  name: home-website-public
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-http01
+  hosts:
+    - host: chriswchang.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: web
+          backendServiceName: home-website-public
+          port: 80
+    - host: www.chriswchang.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: web
+          backendServiceName: home-website-public
+          port: 80
+    # Default route for direct public-IP HTTP requests. HTTPS by IP will still
+    # show a certificate name mismatch because public certs cannot cover this IP.
+    - paths:
+        - path: /
+          pathType: Prefix
+          service: web
+          backendServiceName: home-website-public
+          port: 80
+  tls:
+    - hosts:
+        - chriswchang.com
+        - www.chriswchang.com
+      secretName: chriswchang-com-tls
+
+extraIngresses:
+  - name: home-website-public-model-trading-api
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/use-regex: "true"
+      nginx.ingress.kubernetes.io/rewrite-target: /api/$2
+    hosts:
+      - host: chriswchang.com
+        paths:
+          - path: /model-trading-bot/api(/|$)(.*)
+            pathType: ImplementationSpecific
+            serviceName: model-trading-bot-backend
+            port: 8000
+      - host: www.chriswchang.com
+        paths:
+          - path: /model-trading-bot/api(/|$)(.*)
+            pathType: ImplementationSpecific
+            serviceName: model-trading-bot-backend
+            port: 8000
+      - paths:
+          - path: /model-trading-bot/api(/|$)(.*)
+            pathType: ImplementationSpecific
+            serviceName: model-trading-bot-backend
+            port: 8000
+    tls:
+      - hosts:
+          - chriswchang.com
+          - www.chriswchang.com
+        secretName: chriswchang-com-tls

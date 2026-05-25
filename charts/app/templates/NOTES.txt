@@ -8,7 +8,9 @@ Services:
 
 Ingress hostnames (add these to /etc/hosts on any device that should reach the app):
 {{- range .Values.ingress.hosts }}
+{{- if .host }}
   127.0.0.1  {{ .host }}    # then visit http://{{ .host }}{{ (first .paths).path }}
+{{- end }}
 {{- end }}
 
 Run `make status` to see the active ingress address. Replace 127.0.0.1 with

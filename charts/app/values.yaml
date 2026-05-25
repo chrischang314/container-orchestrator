@@ -27,10 +27,13 @@ services: []
 #   - name: backend
 #     image: ghcr.io/chrischang314/local-llm/backend
 #     tag: main                   # poll target
+#     resourceName: ""            # optional: Deployment/PVC base name override
 #     port: 8000                  # Service port; omitted = no Service
 #     containerPort: 8000         # optional; defaults to port
 #     serviceName: backend        # optional: override the Service's DNS name
 #                                 # (default: <release>-<service>)
+#     targetPort: http            # optional Service targetPort override
+#     selectorLabels: {}          # optional: adopt legacy selectors
 #     replicas: 1
 #     autoDeploy:
 #       enabled: true
@@ -72,6 +75,7 @@ extraServices: []
 
 ingress:
   enabled: false
+  name: ""                       # optional: override Ingress resource name
   className: nginx
   annotations: {}
   hosts: []
@@ -80,6 +84,7 @@ ingress:
   #     - path: /
   #       pathType: Prefix
   #       service: frontend
+  #       backendServiceName: ""  # optional: route to an explicit Service name
   #       port: 80
   redirects: []
   # - host: old-name.lan
@@ -88,3 +93,7 @@ ingress:
   #   service: frontend             # backend is required by Kubernetes
   #   port: 80
   tls: []                      # populate when cert-manager + ClusterIssuer are configured
+
+# Optional extra Ingress resources for path-specific behavior such as nginx
+# rewrites. Each path points at an explicit Service name.
+extraIngresses: []

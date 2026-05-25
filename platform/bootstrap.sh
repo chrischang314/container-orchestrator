@@ -59,12 +59,15 @@ helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   -f "$ROOT/platform/components/ingress-nginx/values.yaml" \
   --wait --timeout 5m
 
-# 4. cert-manager (dormant) ------------------------------------------------
-step "Installing/upgrading cert-manager (CRDs + controller, no ClusterIssuer yet)"
+# 4. cert-manager ----------------------------------------------------------
+step "Installing/upgrading cert-manager"
 helm upgrade --install cert-manager jetstack/cert-manager \
   --namespace cert-manager --create-namespace \
   -f "$ROOT/platform/components/cert-manager/values.yaml" \
   --wait --timeout 5m
+
+step "Applying cert-manager ClusterIssuers"
+kubectl apply -f "$ROOT/platform/components/cert-manager/cluster-issuer.yaml"
 
 # 5. Keel ------------------------------------------------------------------
 step "Installing/upgrading Keel"

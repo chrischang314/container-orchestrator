@@ -3,7 +3,7 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "app.fullname" . }}
+  name: {{ .Values.ingress.name | default (include "app.fullname" .) }}
   namespace: {{ .Values.namespace | default "default" }}
   labels:
     {{- include "app.labels" . | nindent 4 }}
@@ -15,15 +15,19 @@ spec:
   ingressClassName: {{ .Values.ingress.className | default "nginx" }}
   rules:
     {{- range $host := .Values.ingress.hosts }}
+    {{- if $host.host }}
     - host: {{ $host.host }}
       http:
+    {{- else }}
+    - http:
+    {{- end }}
         paths:
           {{- range $path := $host.paths }}
           - path: {{ $path.path | default "/" }}
             pathType: {{ $path.pathType | default "Prefix" }}
             backend:
               service:
-                name: {{ include "app.serviceFullname" (dict "root" $ "service" (dict "name" $path.service)) }}
+                name: {{ $path.backendServiceName | default (include "app.serviceFullname" (dict "root" $ "service" (dict "name" $path.service))) }}
                 port:
                   number: {{ $path.port }}
           {{- end }}
@@ -57,7 +61,7 @@ spec:
             pathType: {{ $redirect.pathType | default "Prefix" }}
             backend:
               service:
-                name: {{ include "app.serviceFullname" (dict "root" $ "service" (dict "name" $redirect.service)) }}
+                name: {{ $redirect.backendServiceName | default (include "app.serviceFullname" (dict "root" $ "service" (dict "name" $redirect.service))) }}
                 port:
                   number: {{ $redirect.port | default 80 }}
 {{- end }}
