@@ -85,10 +85,17 @@ if [[ "$CTX" != "docker-desktop" ]]; then
     -f "$ROOT/platform/components/synology-nfs-provisioner/values.yaml" \
     --wait --timeout 5m
 
+  if kubectl get storageclass synology-nfs >/dev/null 2>&1; then
+    kubectl patch storageclass synology-nfs \
+      --type=merge \
+      -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}' \
+      >/dev/null
+  fi
+
   if kubectl get storageclass local-path >/dev/null 2>&1; then
     kubectl patch storageclass local-path \
       --type=merge \
-      -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}' \
+      -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}' \
       >/dev/null
   fi
 else

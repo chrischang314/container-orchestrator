@@ -63,7 +63,7 @@ services: []
 #         size: 1Gi
 #         mountPath: /app/data
 #         accessMode: ReadWriteOnce   # default
-#         # storageClassName: local-path   # omit to use the cluster's default
+#         storageClassName: local-path     # cache/default tier; use synology-nfs explicitly for NAS data
 
 # Optional additional Services that point at an existing component Deployment.
 # Useful when one pod needs separate Service types, such as a DNS LoadBalancer

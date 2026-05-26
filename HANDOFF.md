@@ -126,18 +126,22 @@ enabled. Most private GHCR images use the `ghcr-creds` image pull secret.
 
 ## Storage
 
-The default StorageClass is now `synology-nfs`. It dynamically provisions
-directories under the NAS NFS export `192.168.4.33:/volume1/k8s` through the
+The default StorageClass is `local-path`. It is the Mac-mini cache/default tier
+for public/demo workloads and small rebuildable caches. `synology-nfs` is an
+explicit primary-storage tier that dynamically provisions directories under the
+NAS NFS export `192.168.4.33:/volume1/k8s` through the
 `nfs-subdir-external-provisioner` Helm chart. The provisioner values are tracked
 in
 [`platform/components/synology-nfs-provisioner/values.yaml`](platform/components/synology-nfs-provisioner/values.yaml).
+The fallback architecture is documented in
+[`docs/storage-fallback.md`](docs/storage-fallback.md).
 
 Important storage classes:
 
 | StorageClass | Purpose | Notes |
 |---|---|---|
-| `synology-nfs` | Default for new PVCs | Reclaim policy is `Retain`; directories are preserved if a PVC is deleted. |
-| `local-path` | Legacy K3s node-local PVCs | Still present for existing PVCs and rollback, but no longer default. |
+| `local-path` | Default Mac-mini cache tier | `WaitForFirstConsumer`; pin public/demo pods to the node that owns the cache. |
+| `synology-nfs` | Explicit NAS-backed primary data | Reclaim policy is `Retain`; directories are preserved if a PVC is deleted. |
 
 Operational checks:
 
@@ -151,8 +155,7 @@ NFS mount smoke tests have passed from `mac-mini-worker` and `railroad-pi3`.
 The provisioner itself is pinned to `rpi5-control`, where NFS client support is
 also present.
 
-Current PVC-backed workloads were created before Synology became the default,
-so they still use `local-path` until a planned data migration is performed:
+Current local-cache PVC-backed workloads:
 
 | PVC | Current purpose |
 |---|---|
@@ -169,6 +172,11 @@ not delete these PVCs to force reprovisioning unless a backup has already been
 verified. For PostgreSQL, use logical backup/restore (`pg_dump` / restore) or a
 careful cold copy with the database stopped. For app caches, decide whether
 they can be rebuilt before migrating.
+
+Synology-backed PVCs are currently `trading-bot/trading-bot-parquet`,
+`trading-bot/redis-data-redis-0`, `local-llm/local-llm-chat-data`, and
+`local-llm/ollama-model-cache`. Public ingress targets should be able to start
+without mounting those volumes.
 
 ## Synology Worker Status
 

@@ -212,22 +212,22 @@ VM is created on the NAS and joined as the worker instead. The safer near-term
 storage path is to export NAS storage over NFS and use an NFS-backed
 StorageClass while the pods continue to run on Kubernetes-capable nodes.
 
-That safer path is now active. DSM exports `192.168.4.33:/volume1/k8s` over
-NFS, and the cluster has a `synology-nfs` StorageClass installed from
+That safer path is installed. DSM exports `192.168.4.33:/volume1/k8s` over
+NFS, and the cluster has a `synology-nfs` StorageClass from
 [`platform/components/synology-nfs-provisioner/values.yaml`](platform/components/synology-nfs-provisioner/values.yaml).
-`synology-nfs` is the cluster default for new PVCs; `local-path` remains
-installed only for existing volumes and emergency rollback.
+`local-path` remains the cluster default and acts as the Mac-mini cache tier.
+Use `storageClassName: synology-nfs` explicitly for NAS-backed primary data.
+The fallback model is documented in
+[`docs/storage-fallback.md`](docs/storage-fallback.md).
 
 The provisioner pod is pinned to `rpi5-control`. NFS mounts have been smoke
 tested from `mac-mini-worker` and `railroad-pi3`, so future PVC-backed pods can
 mount Synology storage from any current Kubernetes node.
 
-Current storage-heavy workloads are `postgres-postgres`,
-`model-trading-bot-backend`, `local-llm-backend`, and the recruiting app's
-scraper/API cache PVCs. These were created before Synology became the default
-and still use K3s `local-path` storage. They should move by a planned backup
-and restore or cold copy into new Synology-backed PVCs, not by simply changing
-a node selector or deleting PVCs in place.
+Public/demo workloads should keep enough small local cache on the Mac-mini to
+start when the NAS is unavailable. Large source-of-truth data can stay on
+Synology, but it should not be on the critical startup path for
+`chriswchang.com` or its demo links.
 
 ## Auto-deploy flow
 

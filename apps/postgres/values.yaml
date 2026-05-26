@@ -52,3 +52,4 @@ services:
       - name: pgdata
         mountPath: /var/lib/postgresql/data
         size: 10Gi
+        storageClassName: local-path

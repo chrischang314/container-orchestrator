@@ -43,6 +43,7 @@ services:
       - name: data
         size: 1Gi
         mountPath: /app/data
+        storageClassName: local-path
 
     probes:
       readiness:

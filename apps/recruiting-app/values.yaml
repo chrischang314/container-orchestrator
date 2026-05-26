@@ -81,6 +81,7 @@ services:
       - name: hf-cache
         mountPath: /app/.hf-cache
         size: 5Gi
+        storageClassName: local-path
 
   # ── Scraper daemon ─────────────────────────────────────────────────────────
   - name: scraper
@@ -179,9 +180,11 @@ services:
       - name: data
         mountPath: /app/data
         size: 5Gi
+        storageClassName: local-path
       - name: hf-cache
         mountPath: /app/.hf-cache
         size: 5Gi
+        storageClassName: local-path
 
   # -- Optional external PC scraper switches -----------------------------------
   # These tiny pods do not scrape. They give the Kubernetes UI a normal Deployment
