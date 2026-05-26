@@ -161,6 +161,7 @@ Current local-cache PVC-backed workloads:
 |---|---|
 | `postgres-postgres-pgdata` | Recruiting PostgreSQL database |
 | `model-trading-bot-backend-data` | Trading bot backend data |
+| `trading-bot-public-cache` | Public trading-bot dashboard cache; synced back to `trading-bot-parquet` by `trading-bot-cache-sync` |
 | `local-llm-backend-data` | Local LLM app data |
 | `recruiting-app-api-hf-cache` | Recruiting embedding cache |
 | `recruiting-app-scraper-data` | Scraper state/images |
@@ -178,10 +179,19 @@ Synology-backed PVCs are currently `trading-bot/trading-bot-parquet`,
 `local-llm/ollama-model-cache`. Public ingress targets should be able to start
 without mounting those volumes.
 
+`trading-bot-cache-sync` runs every 15 minutes in the `trading-bot` namespace.
+It mounts `trading-bot-public-cache` plus `trading-bot-parquet`, copies stable
+newer files from the Mac-mini cache to the NAS, and never deletes NAS files.
+If the NAS mount is unavailable, the job fails or times out and the next
+scheduled run retries.
+
 ## Synology Worker Status
 
-The NAS is reachable at `192.168.4.33`, SSH is enabled, and the DSM admin user
-can run sudo. Hardware and OS:
+The last configured NAS target is `192.168.4.33:/volume1/k8s`. After the recent
+unplug/replug event, cluster NFS mounts currently report `No route to host` for
+`192.168.4.33`; confirm the NAS LAN IP before relying on `synology-nfs` again.
+When the NAS is reachable, SSH is enabled and the DSM admin user can run sudo.
+Hardware and OS observed previously:
 
 - Model family observed by the kernel: `synology_geminilakenk_ds225+`
 - OS: DSM 7.3.2
