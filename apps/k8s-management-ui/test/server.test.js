@@ -63,7 +63,7 @@ test("server requires confirmation before mutating command execution", async () 
         command,
         stdout: "ok",
         stderr: "",
-        mutating: true
+        mutating: command.includes("cordon")
       };
     }
   });
@@ -72,17 +72,21 @@ test("server requires confirmation before mutating command execution", async () 
   try {
     const base = `http://127.0.0.1:${server.address().port}`;
 
+    const readOnly = await postJson(`${base}/api/command`, { command: "kubectl get nodes" });
+    assert.equal(readOnly.ok, true);
+
     const blocked = await postJson(`${base}/api/command`, { command: "kubectl cordon mac-mini-worker" }, 409);
     assert.equal(blocked.requiresConfirmation, true);
+    assert.equal(blocked.confirmationRequired, true);
     assert.equal(blocked.command, "kubectl cordon mac-mini-worker");
-    assert.deepEqual(calls, []);
+    assert.deepEqual(calls, ["kubectl get nodes"]);
 
     const confirmed = await postJson(`${base}/api/command`, {
       command: "kubectl cordon mac-mini-worker",
       confirmed: true
     });
     assert.equal(confirmed.ok, true);
-    assert.deepEqual(calls, ["kubectl cordon mac-mini-worker"]);
+    assert.deepEqual(calls, ["kubectl get nodes", "kubectl cordon mac-mini-worker"]);
   } finally {
     await close(server);
   }
@@ -106,7 +110,7 @@ test("server requires confirmation before mutating built-in actions", async () =
         command,
         stdout: "ok",
         stderr: "",
-        mutating: true
+        mutating: command.includes("restart")
       };
     }
   });
@@ -115,14 +119,21 @@ test("server requires confirmation before mutating built-in actions", async () =
   try {
     const base = `http://127.0.0.1:${server.address().port}`;
 
+    const readOnly = await postJson(`${base}/api/action`, {
+      action: "rollout-status",
+      namespace: "default",
+      name: "k8s-management-ui-web"
+    });
+    assert.equal(readOnly.ok, true);
+
     const blocked = await postJson(`${base}/api/action`, {
       action: "restart-deployment",
       namespace: "default",
       name: "k8s-management-ui-web"
     }, 409);
     assert.equal(blocked.requiresConfirmation, true);
+    assert.equal(blocked.confirmationRequired, true);
     assert.equal(blocked.command, "kubectl rollout restart deployment/k8s-management-ui-web -n default");
-    assert.deepEqual(calls, []);
 
     await postJson(`${base}/api/action`, {
       action: "restart-deployment",
@@ -130,7 +141,10 @@ test("server requires confirmation before mutating built-in actions", async () =
       name: "k8s-management-ui-web",
       confirmed: true
     });
-    assert.deepEqual(calls, ["kubectl rollout restart deployment/k8s-management-ui-web -n default"]);
+    assert.deepEqual(calls, [
+      "kubectl rollout status deployment/k8s-management-ui-web -n default",
+      "kubectl rollout restart deployment/k8s-management-ui-web -n default"
+    ]);
   } finally {
     await close(server);
   }
@@ -153,6 +167,7 @@ test("server reports disabled mutations without asking for confirmation", async 
     const result = await postJson(`${base}/api/command`, { command: "kubectl cordon mac-mini-worker" }, 400);
 
     assert.equal(result.requiresConfirmation, undefined);
+    assert.equal(result.confirmationRequired, undefined);
     assert.match(result.stderr, /disabled/);
   } finally {
     await close(server);

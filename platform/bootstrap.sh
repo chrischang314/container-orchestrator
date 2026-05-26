@@ -88,14 +88,14 @@ if [[ "$CTX" != "docker-desktop" ]]; then
   if kubectl get storageclass synology-nfs >/dev/null 2>&1; then
     kubectl patch storageclass synology-nfs \
       --type=merge \
-      -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}' \
+      -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}' \
       >/dev/null
   fi
 
   if kubectl get storageclass local-path >/dev/null 2>&1; then
     kubectl patch storageclass local-path \
       --type=merge \
-      -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}' \
+      -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}' \
       >/dev/null
   fi
 else

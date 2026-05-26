@@ -73,7 +73,8 @@ function createServer(options = {}) {
         ok: false,
         error: error.message,
         command: error.command,
-        requiresConfirmation: Boolean(error.requiresConfirmation)
+        requiresConfirmation: Boolean(error.requiresConfirmation),
+        confirmationRequired: Boolean(error.requiresConfirmation)
       });
     }
   });

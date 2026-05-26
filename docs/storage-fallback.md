@@ -4,12 +4,12 @@ The cluster uses two storage tiers:
 
 | Tier | StorageClass | Role |
 |---|---|---|
-| Mac-mini cache | `local-path` | Default for public/demo workloads and small rebuildable caches. Pods must be pinned to the node that owns the data. |
-| Synology primary | `synology-nfs` | Explicit opt-in for large or shared NAS-backed data. Existing PVs retain data when PVCs are removed. |
+| Synology primary | `synology-nfs` | Default backend storage for persistent app data. Existing PVs retain data when PVCs are removed. |
+| Mac-mini cache | `local-path` | Explicit fallback/cache tier for public degraded mode. Pods must be pinned to the node that owns the data. |
 
-The default StorageClass is intentionally `local-path`. That keeps new public
-or demo PVCs off the NAS unless a workload explicitly asks for
-`storageClassName: synology-nfs`.
+The default StorageClass is intentionally `synology-nfs`. That keeps backend
+storage on the NAS when it is healthy. Workloads that need degraded-mode
+Mac-mini cache must explicitly ask for `storageClassName: local-path`.
 
 Use `synology-nfs` only for data that needs NAS capacity or cross-node RWX
 semantics. Use Mac-mini `local-path` for enough cached state to keep the public

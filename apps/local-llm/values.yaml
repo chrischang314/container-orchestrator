@@ -41,9 +41,10 @@ services:
 
     persistence:
       - name: data
+        claimName: local-llm-backend-data-nfs
         size: 1Gi
         mountPath: /app/data
-        storageClassName: local-path
+        storageClassName: synology-nfs
 
     probes:
       readiness:

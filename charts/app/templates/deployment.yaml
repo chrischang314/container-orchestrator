@@ -138,7 +138,7 @@ spec:
             type: DirectoryOrCreate
           {{- else }}
           persistentVolumeClaim:
-            claimName: {{ include "app.serviceResourceName" (dict "root" $ "service" $svc) }}-{{ .name }}
+            claimName: {{ .existingClaim | default .claimName | default (printf "%s-%s" (include "app.serviceResourceName" (dict "root" $ "service" $svc)) .name) }}
           {{- end }}
         {{- end }}
       {{- end }}

@@ -285,7 +285,10 @@ async function runAction(action, payload, options = {}) {
 }
 
 function showCommandResult(result) {
+  const status = result.ok ? "succeeded" : "failed";
+  const kind = result.mutating ? "mutating" : "read-only";
   const out = [
+    `[${formatTime(new Date().toISOString())}] ${kind} command ${status}`,
     `$ ${result.command}`,
     `receipt: ${result.ok ? "completed" : "failed"} | ${result.mutating ? "mutating" : "read-only"} | code ${result.code}`,
     result.stdout || "",

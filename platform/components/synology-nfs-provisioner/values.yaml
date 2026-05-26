@@ -14,10 +14,9 @@ nfs:
 storageClass:
   create: true
   name: synology-nfs
-  # NAS-backed storage is explicit primary storage. The cluster default stays
-  # local-path so public/demo workloads can restart from Mac-mini cache when the
-  # NAS is unreachable.
-  defaultClass: false
+  # NAS-backed storage is the primary backend storage tier. Workloads that need
+  # degraded-mode Mac-mini cache should opt into local-path explicitly.
+  defaultClass: true
   allowVolumeExpansion: true
   # Keep directories if a PVC is accidentally deleted. Database migrations can
   # clean up old folders manually once backups are confirmed.

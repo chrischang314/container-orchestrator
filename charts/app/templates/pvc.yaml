@@ -1,11 +1,11 @@
 {{- range $svc := .Values.services }}
 {{- range $pvc := default (list) $svc.persistence }}
-{{- if not $pvc.hostPath }}
+{{- if and (not $pvc.hostPath) (not $pvc.existingClaim) }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "app.serviceResourceName" (dict "root" $ "service" $svc) }}-{{ $pvc.name }}
+  name: {{ $pvc.claimName | default (printf "%s-%s" (include "app.serviceResourceName" (dict "root" $ "service" $svc)) $pvc.name) }}
   namespace: {{ $.Values.namespace | default "default" }}
   labels:
     {{- include "app.serviceLabels" (dict "root" $ "service" $svc) | nindent 4 }}

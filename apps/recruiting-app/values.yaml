@@ -79,9 +79,10 @@ services:
 
     persistence:
       - name: hf-cache
+        claimName: recruiting-app-api-hf-cache-nfs
         mountPath: /app/.hf-cache
         size: 5Gi
-        storageClassName: local-path
+        storageClassName: synology-nfs
 
   # ── Scraper daemon ─────────────────────────────────────────────────────────
   - name: scraper
@@ -178,13 +179,15 @@ services:
       # Docker Desktop K8s can't bind-mount macOS paths, so we use PVCs and
       # `kubectl cp` the storage_state.json into the pod after deploy.
       - name: data
+        claimName: recruiting-app-scraper-data-nfs
         mountPath: /app/data
         size: 5Gi
-        storageClassName: local-path
+        storageClassName: synology-nfs
       - name: hf-cache
+        claimName: recruiting-app-scraper-hf-cache-nfs
         mountPath: /app/.hf-cache
         size: 5Gi
-        storageClassName: local-path
+        storageClassName: synology-nfs
 
   # -- Optional external PC scraper switches -----------------------------------
   # These tiny pods do not scrape. They give the Kubernetes UI a normal Deployment

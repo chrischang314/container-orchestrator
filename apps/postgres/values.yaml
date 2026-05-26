@@ -50,6 +50,7 @@ services:
 
     persistence:
       - name: pgdata
+        claimName: postgres-postgres-pgdata-nfs
         mountPath: /var/lib/postgresql/data
         size: 10Gi
-        storageClassName: local-path
+        storageClassName: synology-nfs

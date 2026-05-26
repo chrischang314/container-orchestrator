@@ -63,7 +63,9 @@ services: []
 #         size: 1Gi
 #         mountPath: /app/data
 #         accessMode: ReadWriteOnce   # default
-#         storageClassName: local-path     # cache/default tier; use synology-nfs explicitly for NAS data
+#         storageClassName: synology-nfs   # primary backend storage
+#         claimName: ""                    # optional PVC name override for migrations
+#         existingClaim: ""                # optional pre-created PVC; skips PVC creation
 
 # Optional additional Services that point at an existing component Deployment.
 # Useful when one pod needs separate Service types, such as a DNS LoadBalancer

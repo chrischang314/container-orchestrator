@@ -47,9 +47,10 @@ services:
         periodSeconds: 20
     persistence:
       - name: data
+        claimName: model-trading-bot-backend-data-nfs
         mountPath: /app/data
         size: 2Gi
-        storageClassName: local-path
+        storageClassName: synology-nfs
 
   - name: frontend
     image: ghcr.io/chrischang314/model-trading-bot/frontend

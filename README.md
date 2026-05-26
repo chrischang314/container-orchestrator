@@ -215,8 +215,9 @@ StorageClass while the pods continue to run on Kubernetes-capable nodes.
 That safer path is installed. DSM exports `192.168.4.33:/volume1/k8s` over
 NFS, and the cluster has a `synology-nfs` StorageClass from
 [`platform/components/synology-nfs-provisioner/values.yaml`](platform/components/synology-nfs-provisioner/values.yaml).
-`local-path` remains the cluster default and acts as the Mac-mini cache tier.
-Use `storageClassName: synology-nfs` explicitly for NAS-backed primary data.
+`synology-nfs` is the cluster default and primary backend storage tier.
+Use `storageClassName: local-path` explicitly only for Mac-mini degraded-mode
+caches.
 The fallback model is documented in
 [`docs/storage-fallback.md`](docs/storage-fallback.md).
 
