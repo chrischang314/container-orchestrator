@@ -11,9 +11,9 @@ The default StorageClass is intentionally `synology-nfs`. That keeps backend
 storage on the NAS when it is healthy. Workloads that need degraded-mode
 Mac-mini cache must explicitly ask for `storageClassName: local-path`.
 
-Use `synology-nfs` only for data that needs NAS capacity or cross-node RWX
-semantics. Use Mac-mini `local-path` for enough cached state to keep the public
-portfolio and demos looking functional while the NAS is down.
+Use `synology-nfs` for normal backend storage. Use Mac-mini `local-path` only
+for enough cached state to keep the public portfolio and demos looking
+functional while the NAS is down, or for software that cannot safely run on NFS.
 
 ## Degraded Mode Rules
 
@@ -30,19 +30,27 @@ portfolio and demos looking functional while the NAS is down.
 | Workload | Public path | Fallback storage |
 |---|---|---|
 | `home-website-public` | `chriswchang.com` | Stateless image; no PVC. |
-| `model-trading-bot` | `/model-trading-bot/` | Mac-mini `local-path` backend cache. |
-| `trading-bot` | `/trading-bot/` | `trading-bot-public-cache` Mac-mini `local-path` PVC, reconciled back to the NAS by `trading-bot-cache-sync`. |
-| `local-llm` Helm app | `/local-llm/` | Mac-mini `local-path` app data plus Mac host Ollama. |
+| `model-trading-bot` | `/model-trading-bot/` | Primary backend data is on `synology-nfs`; old local PVC is retained only as rollback data. |
+| `trading-bot` | `/trading-bot/` | Primary parquet data is on `synology-nfs`; `trading-bot-public-cache` remains as the Mac-mini degraded-mode cache and is reconciled by `trading-bot-cache-sync`. |
+| `local-llm` Helm app | `/local-llm/` | Primary app data is on `synology-nfs` plus Mac host Ollama. |
 | `k8s-cluster-status` | `/cluster-status/` | Stateless read-only service. |
 
 Synology-backed PVCs still exist for source-of-truth or high-capacity data:
 
 - `trading-bot/trading-bot-parquet`
 - `trading-bot/redis-data-redis-0`
+- `default/postgres-postgres-pgdata-nfs`
+- `default/model-trading-bot-backend-data-nfs`
+- `default/local-llm-backend-data-nfs`
+- `default/recruiting-app-*-nfs`
 - `local-llm/local-llm-chat-data`
 - `local-llm/ollama-model-cache`
 
 These should not be on the critical path for public demo startup.
+
+`trading-bot/questdb-data-questdb-0` is an intentional `local-path` exception.
+QuestDB 8.1.1 detects NFS for its database root and exits because NFS is not a
+supported filesystem for QuestDB data files.
 
 ## Cache Reconciliation
 

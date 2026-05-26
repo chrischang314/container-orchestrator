@@ -8,6 +8,8 @@ services:
     tag: pg16
     port: 5432
     serviceName: postgres
+    strategy:
+      type: Recreate
     nodeSelector:
       kubernetes.io/hostname: mac-mini-worker
     autoDeploy:
@@ -23,6 +25,8 @@ services:
             key: password
       - name: POSTGRES_DB
         value: recruiting
+      - name: POSTGRES_HOST_AUTH_METHOD
+        value: scram-sha-256
       # Silence the "initdb: error: directory ... exists but is not empty" warning
       # that fires on restart when the PVC already contains an initialized cluster.
       - name: PGDATA
@@ -36,16 +40,21 @@ services:
         memory: 512Mi
 
     probes:
+      startup:
+        exec:
+          command: ["pg_isready", "-U", "recruiting", "-d", "template1"]
+        periodSeconds: 5
+        failureThreshold: 60
       readiness:
         exec:
-          command: ["pg_isready", "-U", "recruiting", "-d", "recruiting"]
+          command: ["pg_isready", "-U", "recruiting", "-d", "template1"]
         initialDelaySeconds: 10
         periodSeconds: 5
         failureThreshold: 12
       liveness:
         exec:
-          command: ["pg_isready", "-U", "recruiting", "-d", "recruiting"]
-        initialDelaySeconds: 30
+          command: ["pg_isready", "-U", "recruiting", "-d", "template1"]
+        initialDelaySeconds: 120
         periodSeconds: 15
 
     persistence:

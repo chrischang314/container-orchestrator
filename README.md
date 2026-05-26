@@ -218,6 +218,8 @@ NFS, and the cluster has a `synology-nfs` StorageClass from
 `synology-nfs` is the cluster default and primary backend storage tier.
 Use `storageClassName: local-path` explicitly only for Mac-mini degraded-mode
 caches.
+QuestDB is the current exception: it exits when its database root is on NFS, so
+its data PVC stays on `local-path`.
 The fallback model is documented in
 [`docs/storage-fallback.md`](docs/storage-fallback.md).
 

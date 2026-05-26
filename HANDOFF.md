@@ -158,13 +158,14 @@ Current local-cache PVC-backed workloads:
 
 | PVC | Current purpose |
 |---|---|
-| `postgres-postgres-pgdata` | Recruiting PostgreSQL database |
-| `model-trading-bot-backend-data` | Trading bot backend data |
+| `postgres-postgres-pgdata-nfs` | Recruiting PostgreSQL database on Synology NFS |
+| `model-trading-bot-backend-data-nfs` | Trading bot backend data on Synology NFS |
 | `trading-bot-public-cache` | Public trading-bot dashboard cache; synced back to `trading-bot-parquet` by `trading-bot-cache-sync` |
-| `local-llm-backend-data` | Local LLM app data |
-| `recruiting-app-api-hf-cache` | Recruiting embedding cache |
-| `recruiting-app-scraper-data` | Scraper state/images |
-| `recruiting-app-scraper-hf-cache` | Scraper embedding/cache data |
+| `local-llm-backend-data-nfs` | Local LLM app data on Synology NFS |
+| `recruiting-app-api-hf-cache-nfs` | Recruiting embedding cache on Synology NFS |
+| `recruiting-app-scraper-data-nfs` | Scraper state/images on Synology NFS |
+| `recruiting-app-scraper-hf-cache-nfs` | Scraper embedding/cache data on Synology NFS |
+| `questdb-data-questdb-0` | QuestDB local-path exception; QuestDB refuses to start when its database root is on NFS |
 
 Do not move a stateful Deployment by only changing `nodeSelector`; with
 local-path PVCs that can leave the pod pending or detached from its data. Do
@@ -174,9 +175,10 @@ careful cold copy with the database stopped. For app caches, decide whether
 they can be rebuilt before migrating.
 
 Synology-backed PVCs are currently `trading-bot/trading-bot-parquet`,
-`trading-bot/redis-data-redis-0`, `local-llm/local-llm-chat-data`, and
-`local-llm/ollama-model-cache`. Public ingress targets should be able to start
-without mounting those volumes.
+`trading-bot/redis-data-redis-0`, `default/postgres-postgres-pgdata-nfs`,
+`default/model-trading-bot-backend-data-nfs`, `default/local-llm-backend-data-nfs`,
+`default/recruiting-app-*-nfs`, `local-llm/local-llm-chat-data`, and
+`local-llm/ollama-model-cache`.
 
 `trading-bot-cache-sync` runs every 15 minutes in the `trading-bot` namespace.
 It mounts `trading-bot-public-cache` plus `trading-bot-parquet`, copies stable

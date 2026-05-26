@@ -25,6 +25,8 @@ services:
     tag: public-sources-20260520-2346
     port: 8000
     replicas: 1
+    strategy:
+      type: Recreate
     nodeSelector:
       kubernetes.io/hostname: mac-mini-worker
 
