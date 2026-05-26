@@ -51,7 +51,7 @@ numbers:
 
 | URL | Workload | Placement |
 |---|---|---|
-| `http://projects.lan/` | Homelab launchpad and portfolio preview | Mac Mini worker |
+| `http://projects.lan/` | Homelab launchpad and portfolio preview. `homewebsite.lan` redirects here. | Mac Mini worker |
 | `http://homeassistant.lan/` | Home Assistant UI | Raspberry Pi 5 control plane |
 | `http://homebridge.lan/` | Homebridge UI | Raspberry Pi 5 control plane |
 | `http://k8s.lan/` | Kubernetes cluster management UI | Raspberry Pi 5 control plane |
@@ -122,6 +122,10 @@ because each pod runs the full scheduler.
    hostnames like `recruitingapp.lan` and `modeltradingbot.lan`. Visit
    `http://<host>` with no port number; ingress-nginx owns the normal web
    ports `80/443`.
+
+For `home-website`, keep browser-facing app links on the `.lan` names but set
+server-side proxy and health URLs to Kubernetes service DNS in
+`apps/home-website/values.yaml`. Pods cannot rely on Pi-hole-only hostnames.
 
 ## Repo layout
 
@@ -242,3 +246,8 @@ internal `k8s-cluster-status` read-only service used by the public portfolio's
 
 For faster public deploys, the polling can be replaced by a webhook from
 Actions.
+
+The LAN `k8s-management-ui` requires an explicit confirmation step for
+mutating cluster actions and typed mutating `kubectl` commands. The backend
+also rejects unconfirmed mutations, so the dialog is an operator-safety layer on
+top of server-side enforcement.

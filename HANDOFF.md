@@ -38,6 +38,7 @@ cluster ingress address:
 |---|---|
 | `projects.lan` | `http://projects.lan/` |
 | `homewebsite.lan` | redirects to `http://projects.lan/` |
+| `homeassistant.lan` | `http://homeassistant.lan/` |
 | `homebridge.lan` | `http://homebridge.lan/` |
 | `k8s.lan` | `http://k8s.lan/` |
 | `localllm.lan` | `http://localllm.lan/` |
@@ -80,8 +81,9 @@ kubectl exec deploy/pihole-pihole -- pihole-FTL --config dns.hosts
 |---|---|---|---|---|
 | `home-website` | `ghcr.io/chrischang314/home-website:main` | `projects.lan` | `mac-mini-worker` | LAN launchpad. `homewebsite.lan` redirects here. User-facing links use `.lan`; status probes use internal K8s service DNS. |
 | `home-website-public` | `ghcr.io/chrischang314/home-website:public` | `chriswchang.com` | `mac-mini-worker` | Public portfolio with TLS via `letsencrypt-http01`; also catches direct public-IP HTTP requests. |
+| `home-assistant` | `ghcr.io/home-assistant/home-assistant:stable` | `homeassistant.lan` | `rpi5-control` | Uses `hostNetwork: true` for discovery/integrations. Config path is `/srv/home-assistant` on the Pi. |
 | `homebridge` | `homebridge/homebridge:latest` | `homebridge.lan` | `rpi5-control` | Uses `hostNetwork: true` for HomeKit/mDNS reliability. Config path is `/srv/homebridge` on the Pi. |
-| `k8s-management-ui` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | `k8s.lan` | `rpi5-control` | LAN control panel for nodes, containers, deployments, and allowlisted kubectl controls. Uses cluster-scoped RBAC. |
+| `k8s-management-ui` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | `k8s.lan` | `rpi5-control` | LAN control panel for nodes, containers, deployments, and allowlisted kubectl controls. Mutating controls require UI confirmation and backend `confirmed: true` before execution. Uses cluster-scoped RBAC. |
 | `k8s-cluster-status` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | internal only | `rpi5-control` | Read-only public-status service for the portfolio `/cluster-status/` proxy. Uses read-only RBAC and sanitized aggregate output. |
 | `local-llm` | `ghcr.io/chrischang314/local-llm/*:main` | `localllm.lan` | `mac-mini-worker` | Backend reaches Ollama on the Mac host through `host.lima.internal:11434`, aliasing to `192.168.5.2`. |
 | `model-railroad-automation` | `ghcr.io/chrischang314/model-railroad-automation/web-control:main` | `modelrailroadautomation.lan` | `railroad-pi3` | Train web server; talks to DCC-EX at `192.168.4.22:2560`. |
@@ -218,9 +220,9 @@ move later if the NAS proves reliable and performant.
   `/Users/chrischang/.lima/_config/networks.yaml`.
 - K3s pod DNS on the Lima worker depends on a sane resolver file. The working
   setup uses K3S_RESOLV_CONF with `/run/systemd/resolve/resolv.conf`.
-- The home website server runs inside Kubernetes, so its health checks cannot
-  rely on Pi-hole `.lan` DNS. It uses internal service DNS for probes and `.lan`
-  URLs for links.
+- The home website server runs inside Kubernetes, so its health checks and
+  proxied demo routes cannot rely on Pi-hole `.lan` DNS. It uses internal
+  service DNS for probes/proxies and `.lan` URLs for user-facing links.
 - Homebridge uses host networking because HomeKit discovery depends on LAN
   multicast/mDNS.
 - Railroad control is intentionally placed on the Pi near the train hardware.
@@ -250,7 +252,23 @@ kubectl rollout status deployment/home-website-web --timeout=120s
 # Verify Synology-backed dynamic storage.
 kubectl get sc synology-nfs
 kubectl get pods -n storage -o wide
+
+# Check the launchpad and proxied public-preview routes.
+curl.exe -I http://projects.lan/
+curl.exe -I http://projects.lan/model-trading-bot/
+curl.exe -I http://projects.lan/trading-bot/
+curl.exe -I http://projects.lan/local-llm/
+curl.exe -I http://projects.lan/railroad-automation/
+curl.exe -I http://projects.lan/cluster-status/
 ```
 ## Agent Operating Policy
 
 Project-specific Codex rules now live in `AGENTS.md`. Use them before adding worker nodes or deploying containers. The important rule is simple: after any deployment, verify Helm lint, rollout status, pod health/logs when needed, and the LAN or health endpoint before calling the work complete.
+
+## K8s UI Mutation Safety
+
+The LAN `k8s-management-ui` requires a confirmation dialog before built-in
+mutating actions or typed mutating `kubectl` commands send a network request.
+The backend also rejects unconfirmed mutating `/api/action` and `/api/command`
+calls with HTTP 409, while read-only controls stay one-click. Receipts show the
+exact command, mutating/read-only classification, exit code, stdout, and stderr.

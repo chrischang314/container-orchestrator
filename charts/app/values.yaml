@@ -35,6 +35,10 @@ services: []
 #     targetPort: http            # optional Service targetPort override
 #     selectorLabels: {}          # optional: adopt legacy selectors
 #     replicas: 1
+#     component: backend              # optional app.kubernetes.io/component override
+#     labels: {}                      # optional extra Deployment labels
+#     selectorLabels: {}              # optional extra selector/template labels
+#     annotations: {}                 # optional Deployment annotations
 #     autoDeploy:
 #       enabled: true
 #       pollSchedule: "@every 5m"

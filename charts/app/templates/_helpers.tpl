@@ -28,6 +28,15 @@ overridden when adopting a pre-existing deployment/service naming convention.
 {{- end -}}
 
 {{/*
+Component label for a service. Defaults to the service name, but can be
+overridden for resources such as external worker switches that share a component
+type and use an additional selector label for uniqueness.
+*/}}
+{{- define "app.serviceComponent" -}}
+{{- default .service.name .service.component -}}
+{{- end -}}
+
+{{/*
 Top-level labels (no per-service component label). Call with a scope where
 .Release and .Values are available — e.g. `{{ include "app.labels" . }}`.
 */}}
@@ -45,8 +54,11 @@ Per-service labels — adds component. Expects (dict "root" $ "service" $svc).
 app.kubernetes.io/name: {{ default .root.Release.Name .root.Values.nameOverride }}
 app.kubernetes.io/instance: {{ .root.Release.Name }}
 app.kubernetes.io/managed-by: {{ .root.Release.Service }}
-app.kubernetes.io/component: {{ .service.name }}
+app.kubernetes.io/component: {{ include "app.serviceComponent" . }}
 helm.sh/chart: {{ printf "%s-%s" .root.Chart.Name .root.Chart.Version | replace "+" "_" }}
+{{ with .service.labels }}
+{{ toYaml . }}
+{{- end }}
 {{- end -}}
 
 {{/*
@@ -58,7 +70,10 @@ Selector labels (must be stable across upgrades — never include chart/version)
 {{- else -}}
 app.kubernetes.io/name: {{ default .root.Release.Name .root.Values.nameOverride }}
 app.kubernetes.io/instance: {{ .root.Release.Name }}
-app.kubernetes.io/component: {{ .service.name }}
+app.kubernetes.io/component: {{ include "app.serviceComponent" . }}
+{{ with .service.selectorLabels }}
+{{ toYaml . }}
+{{- end }}
 {{- end -}}
 {{- end -}}
 

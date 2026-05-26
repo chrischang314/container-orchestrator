@@ -15,6 +15,9 @@ metadata:
     keel.sh/pollSchedule: {{ default "@every 5m" $auto.pollSchedule | quote }}
     keel.sh/match-tag: "true"
     {{- end }}
+    {{- with $svc.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
   replicas: {{ default 1 $svc.replicas }}
   {{- if $svc.strategy }}

@@ -54,6 +54,12 @@ button:disabled {
   opacity: 0.55;
 }
 
+.danger-button {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+}
+
 .app-shell {
   min-height: 100vh;
   padding: 24px;
@@ -385,6 +391,47 @@ pre {
   padding: 14px;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.confirmation-backdrop {
+  align-items: center;
+  background: rgba(16, 23, 21, 0.42);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 18px;
+  position: fixed;
+  z-index: 50;
+}
+
+.confirmation-dialog {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  max-width: 640px;
+  padding: 16px;
+  width: min(100%, 640px);
+}
+
+.confirmation-impact {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.confirmation-command {
+  min-height: 72px;
+}
+
+.confirmation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.hidden {
+  display: none;
 }
 
 .empty-state {

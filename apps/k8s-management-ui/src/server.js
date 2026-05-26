@@ -3,7 +3,7 @@
 const fs = require("node:fs");
 const http = require("node:http");
 const path = require("node:path");
-const { actionToCommand, runKubectl } = require("./command");
+const { actionToCommand, runKubectl, validateKubectlCommand } = require("./command");
 const { createKubernetesClient, shouldUseDemoMode } = require("./kubernetes");
 
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
@@ -49,6 +49,7 @@ function createServer(options = {}) {
       if (req.method === "POST" && url.pathname === "/api/command") {
         if (publicStatus) return json(res, 403, { ok: false, error: "Command endpoints are disabled in public status mode." });
         const body = await readJson(req);
+        requireMutationConfirmation(body.command, body, { allowMutations });
         const result = await commandRunner(body.command);
         return json(res, result.ok ? 200 : 400, result);
       }
@@ -57,6 +58,7 @@ function createServer(options = {}) {
         if (publicStatus) return json(res, 403, { ok: false, error: "Action endpoints are disabled in public status mode." });
         const body = await readJson(req);
         const command = actionToCommand(body.action, body);
+        requireMutationConfirmation(command, body, { allowMutations });
         const result = await commandRunner(command);
         return json(res, result.ok ? 200 : 400, result);
       }
@@ -67,9 +69,27 @@ function createServer(options = {}) {
 
       return json(res, 405, { ok: false, error: "Method not allowed." });
     } catch (error) {
-      return json(res, 500, { ok: false, error: error.message });
+      return json(res, error.statusCode || 500, {
+        ok: false,
+        error: error.message,
+        command: error.command,
+        requiresConfirmation: Boolean(error.requiresConfirmation)
+      });
     }
   });
+}
+
+function requireMutationConfirmation(command, body = {}, options = {}) {
+  if (!options.allowMutations) return;
+
+  const validation = validateKubectlCommand(command, { allowMutations: true });
+  if (!validation.ok || !validation.mutating || body.confirmed === true) return;
+
+  const error = new Error("Mutating command requires confirmation.");
+  error.statusCode = 409;
+  error.command = String(command || "").trim();
+  error.requiresConfirmation = true;
+  throw error;
 }
 
 function publicClusterSnapshot(snapshot) {
@@ -241,5 +261,6 @@ if (require.main === module) {
 module.exports = {
   createServer,
   publicClusterSnapshot,
+  requireMutationConfirmation,
   readJson
 };

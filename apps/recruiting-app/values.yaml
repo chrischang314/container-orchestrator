@@ -22,7 +22,7 @@ services:
   # ── API ────────────────────────────────────────────────────────────────────
   - name: api
     image: ghcr.io/chrischang314/recruiting-app/api
-    tag: main
+    tag: public-sources-20260520-2346
     port: 8000
     replicas: 1
     nodeSelector:
@@ -85,7 +85,7 @@ services:
   # ── Scraper daemon ─────────────────────────────────────────────────────────
   - name: scraper
     image: ghcr.io/chrischang314/recruiting-app/scraper
-    tag: onepoint-full-20260520-0218
+    tag: public-sources-20260521-0039
     # No port — daemon only, no HTTP surface.
     replicas: 1
     strategy:
@@ -104,7 +104,7 @@ services:
       - name: HF_HOME
         value: /app/.hf-cache
       - name: SCRAPER_SOURCES
-        value: hackernews,reddit
+        value: geeksforgeeks,code360,stackexchange,devto,nowcoder,hackernews,reddit
       - name: SCRAPER_HEADLESS
         value: "true"
       - name: SCRAPER_STORAGE_STATE_PATH
@@ -133,6 +133,8 @@ services:
         value: "50"
       - name: SCRAPER_MAX_THREAD_PAGES_PER_POST
         value: "0"
+      - name: SCRAPER_ENABLE_CRAWL
+        value: "false"
       - name: SCRAPER_ENABLE_EMBED
         value: "true"
       - name: SCRAPER_ENABLE_OCR
@@ -145,6 +147,22 @@ services:
         value: "50"
       - name: SCRAPER_HACKERNEWS_LIMIT_PER_QUERY
         value: "100"
+      - name: SCRAPER_STACKEXCHANGE_LIMIT_PER_QUERY
+        value: "10"
+      - name: SCRAPER_STACKEXCHANGE_SITES
+        value: workplace
+      - name: SCRAPER_STACKEXCHANGE_QUERIES
+        value: interview,offer negotiation
+      - name: SCRAPER_DEVTO_LIMIT_PER_TAG
+        value: "30"
+      - name: SCRAPER_GEEKSFORGEEKS_MAX_PAGES
+        value: "3"
+      - name: SCRAPER_CODE360_PAGES
+        value: "3"
+      - name: SCRAPER_CODE360_LIMIT_PER_PAGE
+        value: "50"
+      - name: SCRAPER_NOWCODER_LIMIT
+        value: "50"
 
     resources:
       requests:
@@ -164,6 +182,62 @@ services:
       - name: hf-cache
         mountPath: /app/.hf-cache
         size: 5Gi
+
+  # -- Optional external PC scraper switches -----------------------------------
+  # These tiny pods do not scrape. They give the Kubernetes UI a normal Deployment
+  # to scale; Windows-side controllers watch the switch and start/stop local
+  # Docker crawler containers on each PC.
+  - name: chris-pc-2-scraper-switch
+    component: external-worker-switch
+    image: registry.k8s.io/pause
+    tag: "3.10"
+    replicas: 1
+    autoDeploy:
+      enabled: false
+    labels:
+      local-llm.io/worker: chris-pc-2-scraper
+      local-llm.io/optional: "true"
+      recruiting-app.io/worker: chris-pc-2-scraper
+      recruiting-app.io/role: crawler
+    selectorLabels:
+      local-llm.io/worker: chris-pc-2-scraper
+    annotations:
+      local-llm.io/control-help: "Scale replicas to 1 to enable CHRIS-PC-2 recruiting scraper, or 0 to stop it."
+      local-llm.io/controlled-by: "scripts/local-scraper-worker-controller.ps1 running on CHRIS-PC-2"
+      recruiting-app.io/sources: "devto,hackernews,reddit"
+    resources:
+      requests:
+        cpu: 1m
+        memory: 8Mi
+      limits:
+        cpu: 5m
+        memory: 16Mi
+
+  - name: chris-pc-1-scraper-switch
+    component: external-worker-switch
+    image: registry.k8s.io/pause
+    tag: "3.10"
+    replicas: 1
+    autoDeploy:
+      enabled: false
+    labels:
+      local-llm.io/worker: chris-pc-1-scraper
+      local-llm.io/optional: "true"
+      recruiting-app.io/worker: chris-pc-1-scraper
+      recruiting-app.io/role: crawler
+    selectorLabels:
+      local-llm.io/worker: chris-pc-1-scraper
+    annotations:
+      local-llm.io/control-help: "Scale replicas to 1 to enable CHRIS-PC-1 recruiting scraper, or 0 to stop it."
+      local-llm.io/controlled-by: "scripts/local-scraper-worker-controller.ps1 running on CHRIS-PC-1"
+      recruiting-app.io/sources: "geeksforgeeks,code360,stackexchange,nowcoder"
+    resources:
+      requests:
+        cpu: 1m
+        memory: 8Mi
+      limits:
+        cpu: 5m
+        memory: 16Mi
 
   # ── Frontend ───────────────────────────────────────────────────────────────
   - name: frontend
