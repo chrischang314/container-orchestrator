@@ -282,8 +282,8 @@ services:
   # This is a separate build from the LAN frontend because the public site mounts
   # the app at /recruiting-app while recruitingapp.lan serves it from /.
   - name: frontend-public
-    image: ghcr.io/chrischang314/recruiting-app/frontend-public
-    tag: main
+    image: ghcr.io/chrischang314/recruiting-app/frontend
+    tag: public
     port: 13001
     containerPort: 3000
     replicas: 1
