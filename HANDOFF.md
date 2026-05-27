@@ -125,6 +125,12 @@ helm upgrade --install <project> charts/app \
 Keel is installed and polls tagged images when a service has `autoDeploy`
 enabled. Most private GHCR images use the `ghcr-creds` image pull secret.
 
+Selector note: `selectorLabels` is a full legacy selector override. For normal
+services that need one extra stable selector label, keep the chart's default
+app/instance/component labels and set `extraSelectorLabels` instead. The
+recruiting app's optional PC scraper switches use this to avoid immutable
+Deployment selector drift during Helm upgrades.
+
 ## Storage
 
 The default StorageClass is `synology-nfs`. It is the primary backend-storage

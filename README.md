@@ -130,6 +130,11 @@ The public recruiting demo proxy points at the internal
 `recruiting-app-frontend-public` service with the `/recruiting-app` upstream
 path so the base-path-aware Next.js build receives the route it expects.
 
+In `charts/app`, use `selectorLabels` only when adopting a full legacy
+selector. Use `extraSelectorLabels` when a service needs the standard
+app/instance/component selector plus one more stable label, such as the
+recruiting app's optional PC scraper switches.
+
 ## Repo layout
 
 ```

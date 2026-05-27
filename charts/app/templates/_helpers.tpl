@@ -71,7 +71,7 @@ Selector labels (must be stable across upgrades — never include chart/version)
 app.kubernetes.io/name: {{ default .root.Release.Name .root.Values.nameOverride }}
 app.kubernetes.io/instance: {{ .root.Release.Name }}
 app.kubernetes.io/component: {{ include "app.serviceComponent" . }}
-{{ with .service.selectorLabels }}
+{{ with .service.extraSelectorLabels }}
 {{ toYaml . }}
 {{- end }}
 {{- end -}}

@@ -33,11 +33,11 @@ services: []
 #     serviceName: backend        # optional: override the Service's DNS name
 #                                 # (default: <release>-<service>)
 #     targetPort: http            # optional Service targetPort override
-#     selectorLabels: {}          # optional: adopt legacy selectors
+#     selectorLabels: {}          # optional: full legacy selector override
 #     replicas: 1
 #     component: backend              # optional app.kubernetes.io/component override
 #     labels: {}                      # optional extra Deployment labels
-#     selectorLabels: {}              # optional extra selector/template labels
+#     extraSelectorLabels: {}         # optional additive selector/template labels
 #     annotations: {}                 # optional Deployment annotations
 #     autoDeploy:
 #       enabled: true

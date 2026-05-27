@@ -207,7 +207,7 @@ services:
       local-llm.io/optional: "true"
       recruiting-app.io/worker: chris-pc-2-scraper
       recruiting-app.io/role: crawler
-    selectorLabels:
+    extraSelectorLabels:
       local-llm.io/worker: chris-pc-2-scraper
     annotations:
       local-llm.io/control-help: "Scale replicas to 1 to enable CHRIS-PC-2 recruiting scraper, or 0 to stop it."
@@ -233,7 +233,7 @@ services:
       local-llm.io/optional: "true"
       recruiting-app.io/worker: chris-pc-1-scraper
       recruiting-app.io/role: crawler
-    selectorLabels:
+    extraSelectorLabels:
       local-llm.io/worker: chris-pc-1-scraper
     annotations:
       local-llm.io/control-help: "Scale replicas to 1 to enable CHRIS-PC-1 recruiting scraper, or 0 to stop it."
