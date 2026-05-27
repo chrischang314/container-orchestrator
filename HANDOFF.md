@@ -90,7 +90,7 @@ kubectl exec deploy/pihole-pihole -- pihole-FTL --config dns.hosts
 | `model-trading-bot` | `ghcr.io/chrischang314/model-trading-bot/*:main` | `modeltradingbot.lan` | `mac-mini-worker` | Frontend plus backend with local data PVC. |
 | `pihole` | `pihole/pihole:latest` | `pihole.lan` | `rpi5-control` | DNS on port 53, web via ingress. Config paths are `/srv/pihole/etc-pihole` and `/srv/pihole/etc-dnsmasq.d`. |
 | `postgres` | `pgvector/pgvector:pg16` | internal only | `mac-mini-worker` | Shared PostgreSQL/pgvector database for recruiting app. |
-| `recruiting-app` | `ghcr.io/chrischang314/recruiting-app/*:main` | `recruitingapp.lan` | `mac-mini-worker` | API, frontend, scraper. 1point3acres requires a copied `data/storage_state.json`, but it is disabled while the current session returns `user_banned` / "用户组: 不准访问". Active scraper sources are Hacker News + Reddit with embeddings/OCR enabled and a faster public-source profile. |
+| `recruiting-app` | `ghcr.io/chrischang314/recruiting-app/*:main` | `recruitingapp.lan` | `mac-mini-worker` | API, LAN frontend, public `/recruiting-app` frontend, scraper. The public frontend is a separate `frontend-public` service built with `NEXT_PUBLIC_BASE_PATH=/recruiting-app` for the `chriswchang.com/recruiting-app` proxy. 1point3acres requires a copied `data/storage_state.json`, but it is disabled while the current session returns `user_banned` / "用户组: 不准访问". Active scraper sources are Hacker News + Reddit with embeddings/OCR enabled and a faster public-source profile. |
 | `csb1-ota-updater` | `ghcr.io/chrischang314/model-railroad-csb1-updater:latest` | none | `railroad-pi3` | Runs in namespace `railroad`; used for train hardware support. |
 
 Legacy LoadBalancer service ports still exist for compatibility:
@@ -99,6 +99,7 @@ Legacy LoadBalancer service ports still exist for compatibility:
 |---|---:|
 | `local-llm-frontend` | `12000` |
 | `recruiting-app-frontend` | `13000` |
+| `recruiting-app-frontend-public` | `13001` |
 | `model-trading-bot-frontend` | `14000` |
 | `model-railroad-automation-web-control` | `15000` |
 

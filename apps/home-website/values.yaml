@@ -50,6 +50,8 @@ services:
         value: http://trading-bot.trading-bot.svc.cluster.local
       - name: LOCAL_LLM_PROXY_URL
         value: http://local-llm-frontend.default.svc.cluster.local:12000
+      - name: RECRUITING_APP_PROXY_URL
+        value: http://recruiting-app-frontend-public.default.svc.cluster.local:13001/recruiting-app
       - name: MODEL_RAILROAD_PROXY_URL
         value: http://model-railroad-automation-web-control.default.svc.cluster.local:15000
       - name: K8S_CLUSTER_STATUS_PROXY_URL

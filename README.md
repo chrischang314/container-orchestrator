@@ -126,6 +126,9 @@ because each pod runs the full scheduler.
 For `home-website`, keep browser-facing app links on the `.lan` names but set
 server-side proxy and health URLs to Kubernetes service DNS in
 `apps/home-website/values.yaml`. Pods cannot rely on Pi-hole-only hostnames.
+The public recruiting demo proxy points at the internal
+`recruiting-app-frontend-public` service with the `/recruiting-app` upstream
+path so the base-path-aware Next.js build receives the route it expects.
 
 ## Repo layout
 

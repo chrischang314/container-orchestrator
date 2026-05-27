@@ -278,6 +278,41 @@ services:
         initialDelaySeconds: 20
         periodSeconds: 10
 
+  # -- Public demo frontend ----------------------------------------------------
+  # This is a separate build from the LAN frontend because the public site mounts
+  # the app at /recruiting-app while recruitingapp.lan serves it from /.
+  - name: frontend-public
+    image: ghcr.io/chrischang314/recruiting-app/frontend-public
+    tag: main
+    port: 13001
+    containerPort: 3000
+    replicas: 1
+    nodeSelector:
+      kubernetes.io/hostname: mac-mini-worker
+    autoDeploy:
+      enabled: true
+
+    env:
+      - name: API_URL
+        value: http://recruiting-app-api:8000
+      - name: NEXT_PUBLIC_BASE_PATH
+        value: /recruiting-app
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 512Mi
+
+    probes:
+      readiness:
+        httpGet:
+          path: /recruiting-app/
+          port: 3000
+        initialDelaySeconds: 20
+        periodSeconds: 10
+
 ingress:
   enabled: true
   className: nginx
