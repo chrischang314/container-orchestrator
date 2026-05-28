@@ -38,8 +38,13 @@ spec:
       labels:
         {{- include "app.selectorLabels" (dict "root" $ "service" $svc) | nindent 8 }}
     spec:
-      {{- if or $.Values.serviceAccount.create $.Values.serviceAccount.name }}
-      serviceAccountName: {{ include "app.serviceAccountName" $ }}
+      {{- if or $svc.serviceAccountName $.Values.serviceAccount.create $.Values.serviceAccount.name }}
+      serviceAccountName: {{ $svc.serviceAccountName | default (include "app.serviceAccountName" $) }}
+      {{- end }}
+      {{- if hasKey $svc "automountServiceAccountToken" }}
+      automountServiceAccountToken: {{ $svc.automountServiceAccountToken }}
+      {{- else if hasKey $.Values.serviceAccount "automountServiceAccountToken" }}
+      automountServiceAccountToken: {{ $.Values.serviceAccount.automountServiceAccountToken }}
       {{- end }}
       {{- if $svc.hostNetwork }}
       hostNetwork: true

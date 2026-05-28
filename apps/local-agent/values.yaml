@@ -1,0 +1,186 @@
+# Copy to container-orchestrator/apps/local-agent/values.yaml.
+# Keep real secrets in Kubernetes Secrets or encrypted app storage.
+
+namespace: default
+nameOverride: local-agent
+
+imagePullSecrets:
+  - name: ghcr-creds
+
+serviceAccount:
+  create: false
+  automountServiceAccountToken: false
+
+services:
+  - name: backend
+    serviceAccountName: local-agent-backend
+    automountServiceAccountToken: false
+    serviceName: local-agent-backend
+    image: ghcr.io/chrischang314/local-agent/backend
+    tag: main
+    autoDeploy:
+      enabled: false
+    port: 8000
+    replicas: 1
+    nodeSelector:
+      kubernetes.io/hostname: mac-mini-worker
+    env:
+      - name: LOCAL_AGENT_DATABASE_PATH
+        value: /app/data/local-agent.sqlite3
+      - name: LOCAL_AGENT_RETRIEVAL_STORE_PATH
+        value: /app/data/retrieval-store.json
+      - name: LOCAL_AGENT_CHROMA_PATH
+        value: /app/data/chroma
+      - name: LOCAL_AGENT_OPTIMIZATION_STORE_PATH
+        value: /app/data/optimization-store.json
+      - name: SHARED_AUTH_DB
+        value: /shared-auth/auth.db
+      - name: LOCAL_AGENT_SHARED_AUTH_DB
+        value: /shared-auth/auth.db
+      - name: LOCAL_AGENT_AUTH_SECRET_FILE
+        value: /shared-auth/local-agent-jwt-secret
+      - name: LOCAL_AGENT_AUTH_REGISTRATION_ENABLED
+        value: "true"
+      - name: LOCAL_AGENT_AGENT_EXECUTION_ENABLED
+        value: "false"
+      - name: LOCAL_AGENT_CLOUD_FALLBACK_ENABLED
+        value: "false"
+      - name: LOCAL_AGENT_ADMIN_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: local-agent-admin
+            key: token
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        memory: 2Gi
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+      runAsNonRoot: true
+      runAsUser: 10001
+      runAsGroup: 10001
+      seccompProfile:
+        type: RuntimeDefault
+    persistence:
+      - name: data
+        claimName: local-agent-backend-data-nfs
+        size: 20Gi
+        mountPath: /app/data
+        storageClassName: synology-nfs
+      - name: shared-auth
+        claimName: shared-auth-nfs
+        size: 1Gi
+        mountPath: /shared-auth
+        accessMode: ReadWriteMany
+        storageClassName: synology-nfs
+    probes:
+      readiness:
+        httpGet:
+          path: /api/health/ready
+          port: 8000
+        initialDelaySeconds: 5
+        periodSeconds: 10
+      liveness:
+        httpGet:
+          path: /api/health/ready
+          port: 8000
+        initialDelaySeconds: 20
+        periodSeconds: 20
+
+  - name: frontend
+    serviceAccountName: local-agent-frontend
+    automountServiceAccountToken: false
+    serviceName: local-agent-frontend
+    image: ghcr.io/chrischang314/local-agent/frontend
+    tag: main
+    autoDeploy:
+      enabled: false
+    serviceType: LoadBalancer
+    port: 12010
+    containerPort: 8080
+    replicas: 1
+    nodeSelector:
+      kubernetes.io/hostname: mac-mini-worker
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 256Mi
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+      runAsNonRoot: true
+      runAsUser: 101
+      runAsGroup: 101
+      seccompProfile:
+        type: RuntimeDefault
+    probes:
+      readiness:
+        httpGet:
+          path: /
+          port: 8080
+        initialDelaySeconds: 3
+
+  - name: worker
+    serviceAccountName: local-agent-worker
+    automountServiceAccountToken: false
+    image: ghcr.io/chrischang314/local-agent/worker
+    tag: main
+    autoDeploy:
+      enabled: false
+    replicas: 1
+    nodeSelector:
+      kubernetes.io/hostname: mac-mini-worker
+    env:
+      - name: LOCAL_AGENT_WORKER_BROWSER_ENABLED
+        value: "false"
+      - name: LOCAL_AGENT_WORKER_CODING_ENABLED
+        value: "false"
+      - name: LOCAL_AGENT_WORKER_DESKTOP_ENABLED
+        value: "false"
+      - name: LOCAL_AGENT_WORKER_DESKTOP_BACKEND
+        value: synthetic
+      - name: LOCAL_AGENT_WORKER_MCP_ENABLED
+        value: "false"
+      - name: LOCAL_AGENT_WORKER_SMOLAGENTS_ENABLED
+        value: "false"
+      - name: LOCAL_AGENT_WORKER_ARTIFACT_BASE
+        value: /worker/artifacts
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        memory: 2Gi
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+      runAsNonRoot: true
+      runAsUser: 10001
+      runAsGroup: 10001
+      seccompProfile:
+        type: RuntimeDefault
+    persistence:
+      - name: artifacts
+        claimName: local-agent-worker-artifacts-nfs
+        size: 20Gi
+        mountPath: /worker/artifacts
+        storageClassName: synology-nfs
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: localagent.lan
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+          port: 12010

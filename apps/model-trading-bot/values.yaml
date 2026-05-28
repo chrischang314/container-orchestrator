@@ -22,6 +22,8 @@ services:
         value: local
       - name: LOCAL_DATA_DIR
         value: /app/data
+      - name: SHARED_AUTH_DB
+        value: /shared-auth/auth.db
       - name: BOOTSTRAP_ON_STARTUP
         value: "true"
       - name: AUTO_INGEST_ON_EMPTY
@@ -51,6 +53,9 @@ services:
         mountPath: /app/data
         size: 2Gi
         storageClassName: synology-nfs
+      - name: shared-auth
+        existingClaim: shared-auth-nfs
+        mountPath: /shared-auth
 
   - name: frontend
     image: ghcr.io/chrischang314/model-trading-bot/frontend

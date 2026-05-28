@@ -31,6 +31,8 @@ services:
     env:
       - name: OLLAMA_URL
         value: http://host.lima.internal:11434
+      - name: SHARED_AUTH_DB
+        value: /shared-auth/auth.db
 
     resources:
       requests:
@@ -45,6 +47,9 @@ services:
         size: 1Gi
         mountPath: /app/data
         storageClassName: synology-nfs
+      - name: shared-auth
+        existingClaim: shared-auth-nfs
+        mountPath: /shared-auth
 
     probes:
       readiness:
