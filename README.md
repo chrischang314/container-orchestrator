@@ -55,6 +55,7 @@ numbers:
 | `http://homeassistant.lan/` | Home Assistant UI | Raspberry Pi 5 control plane |
 | `http://homebridge.lan/` | Homebridge UI | Raspberry Pi 5 control plane |
 | `http://k8s.lan/` | Kubernetes cluster management UI | Raspberry Pi 5 control plane |
+| `http://localagent.lan/` | Local Agent control UI | Mac Mini worker |
 | `http://localllm.lan/` | Local LLM chat frontend | Mac Mini worker |
 | `http://modelrailroadautomation.lan/` | Railroad control web server | Railroad Pi worker |
 | `http://modeltradingbot.lan/` | Trading bot frontend | Mac Mini worker |
@@ -81,9 +82,11 @@ origin health path.
 
 Recruiting app note: the scraper now requires a copied
 `data/storage_state.json` for authenticated 1point3acres access. It uses the
-Discuz mobile JSON endpoint plus rendered-page enrichment, with embeddings and
-OCR enabled so full-post text, replies, images, and OCR move into the searchable
-pipeline after the full-content rebuild. If the session returns `user_banned`
+Discuz mobile JSON endpoint plus rendered-page enrichment, with embeddings
+enabled so full-post text and replies move into the searchable pipeline after
+the full-content rebuild. OCR is currently paused on the Mac Mini because
+PaddleOCR plus the BGE-M3 embedder can exceed the pod/node memory budget. If
+the session returns `user_banned`
 or "用户组: 不准访问", keep scraper replicas at 0 until a permitted
 `storage_state.json` is copied into the scraper PVC.
 
@@ -92,6 +95,11 @@ only with a faster public-source profile: 6 configured in-flight requests,
 1-2 seconds between request starts, 100 Hacker News results per query, 50
 Reddit results per query, and a 1-hour crawl interval. Keep replicas at 1
 because each pod runs the full scheduler.
+
+Recruiting PostgreSQL runs on the `postgres-postgres-pgdata` Synology NFS PVC.
+It uses readiness and startup probes, but no liveness probe, because killing a
+stateful Postgres pod during NFS recovery or a restore can extend an outage.
+The pod has a 1 GiB memory limit for pgvector-backed recruiting queries.
 
 ## Day-1 setup, end to end
 
@@ -186,6 +194,8 @@ After verification, point the router's DNS/DHCP settings at `192.168.4.56`.
   changes.
 - Pi-hole custom DNS records map the project hostnames to the cluster ingress
   address, so app URLs do not need port numbers.
+- Keep `localagent.lan` and `homeassistant.lan` in `dns.hosts` whenever those
+  apps are enabled on the launchpad.
 - DHCP (port 67) is not exposed in K8s by default. If you use Pi-hole for DHCP,
   add `- name: dhcp / port: 67 / protocol: UDP` to `extraPorts`.
 

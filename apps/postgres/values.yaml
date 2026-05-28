@@ -6,6 +6,9 @@ services:
   - name: postgres
     image: pgvector/pgvector
     tag: pg16
+    # Docker Hub DNS can be transiently unavailable from the Lima worker; keep
+    # restarts from failing when the pgvector image is already cached locally.
+    imagePullPolicy: IfNotPresent
     port: 5432
     serviceName: postgres
     strategy:
@@ -35,31 +38,29 @@ services:
     resources:
       requests:
         cpu: 100m
-        memory: 256Mi
-      limits:
         memory: 512Mi
+      limits:
+        memory: 1Gi
 
     probes:
-      startup:
-        exec:
-          command: ["pg_isready", "-U", "recruiting", "-d", "template1"]
-        periodSeconds: 5
-        failureThreshold: 60
       readiness:
         exec:
-          command: ["pg_isready", "-U", "recruiting", "-d", "template1"]
+          command: ["pg_isready", "-U", "recruiting", "-d", "recruiting"]
         initialDelaySeconds: 10
-        periodSeconds: 5
-        failureThreshold: 12
-      liveness:
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 30
+      # Do not liveness-kill this stateful NFS-backed database. During restore
+      # and high-read startup, pg_isready can temporarily time out even though
+      # Postgres is recovering and should be left alone. Readiness gates clients.
+      startup:
         exec:
-          command: ["pg_isready", "-U", "recruiting", "-d", "template1"]
-        initialDelaySeconds: 120
-        periodSeconds: 15
+          command: ["pg_isready", "-U", "recruiting", "-d", "recruiting"]
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 180
 
     persistence:
       - name: pgdata
-        claimName: postgres-postgres-pgdata-nfs
         mountPath: /var/lib/postgresql/data
         size: 10Gi
-        storageClassName: synology-nfs

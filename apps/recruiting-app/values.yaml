@@ -22,7 +22,7 @@ services:
   # ── API ────────────────────────────────────────────────────────────────────
   - name: api
     image: ghcr.io/chrischang314/recruiting-app/api
-    tag: public-sources-20260520-2346
+    tag: main
     port: 8000
     replicas: 1
     strategy:
@@ -142,7 +142,9 @@ services:
       - name: SCRAPER_ENABLE_EMBED
         value: "true"
       - name: SCRAPER_ENABLE_OCR
-        value: "true"
+        # OCR is paused on the Mac Mini processor because PaddleOCR plus the
+        # loaded BGE-M3 embedder can exceed the pod/node memory budget.
+        value: "false"
       - name: SCRAPER_ENABLE_QUESTION
         value: "true"
       - name: SCRAPER_CRAWL_INTERVAL_HOURS
@@ -282,8 +284,8 @@ services:
   # This is a separate build from the LAN frontend because the public site mounts
   # the app at /recruiting-app while recruitingapp.lan serves it from /.
   - name: frontend-public
-    image: ghcr.io/chrischang314/recruiting-app/frontend
-    tag: public
+    image: ghcr.io/chrischang314/recruiting-app/frontend-public
+    tag: main
     port: 13001
     containerPort: 3000
     replicas: 1
@@ -319,9 +321,9 @@ ingress:
   hosts:
     - host: recruitingapp.lan
       paths:
-        # Keep browser routes on the Next.js frontend. The frontend talks to
-        # FastAPI through the in-cluster API_URL, and its /api/translate route
-        # is a Next.js proxy endpoint.
+        # Keep user-facing routes on the Next.js frontend. The frontend calls
+        # the API through the in-cluster API_URL, so API path prefixes here
+        # would turn pages like /posts/123 and /search into raw JSON.
         - path: /healthz
           pathType: Exact
           service: api

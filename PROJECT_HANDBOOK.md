@@ -31,3 +31,16 @@ If the confirmation UI blocks normal operations, revert the selected
 `k8s-management-ui` commit and redeploy the previous image digest. If the UI is
 the only problem, preserve the backend allowlist and confirmation checks unless
 they are the direct cause of the outage.
+
+## Operating Notes
+
+- PostgreSQL is stateful and should stay on the `postgres-postgres-pgdata`
+  claim backed by the default `synology-nfs` StorageClass. Keep
+  `imagePullPolicy: IfNotPresent` for `pgvector/pgvector:pg16`
+  because node-side Docker Hub DNS failures should not prevent a restart when
+  the image is already cached. Use readiness and startup probes only; a
+  liveness probe can kill Postgres during NFS recovery, restores, or temporary
+  pgvector-heavy read pressure and make the outage longer.
+- Local Agent starts with backend and frontend only. Leave the worker scaled to
+  zero until a `ghcr.io/chrischang314/local-agent/worker:main` image exists and
+  execution features are deliberately enabled.

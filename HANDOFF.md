@@ -41,6 +41,7 @@ cluster ingress address:
 | `homeassistant.lan` | `http://homeassistant.lan/` |
 | `homebridge.lan` | `http://homebridge.lan/` |
 | `k8s.lan` | `http://k8s.lan/` |
+| `localagent.lan` | `http://localagent.lan/` |
 | `localllm.lan` | `http://localllm.lan/` |
 | `modelrailroadautomation.lan` | `http://modelrailroadautomation.lan/` |
 | `modeltradingbot.lan` | `http://modeltradingbot.lan/` |
@@ -85,12 +86,13 @@ kubectl exec deploy/pihole-pihole -- pihole-FTL --config dns.hosts
 | `homebridge` | `homebridge/homebridge:latest` | `homebridge.lan` | `rpi5-control` | Uses `hostNetwork: true` for HomeKit/mDNS reliability. Config path is `/srv/homebridge` on the Pi. |
 | `k8s-management-ui` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | `k8s.lan` | `rpi5-control` | LAN control panel for nodes, containers, deployments, and allowlisted kubectl controls. Mutating controls require UI confirmation and backend `confirmed: true` before execution; cluster-scoped RBAC remains the enforcement layer. |
 | `k8s-cluster-status` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | internal only | `rpi5-control` | Read-only public-status service for the portfolio `/cluster-status/` proxy. Uses read-only RBAC and sanitized aggregate output. |
+| `local-agent` | `ghcr.io/chrischang314/local-agent/backend:main`, `frontend:main` | `localagent.lan` | `mac-mini-worker` | Backend and frontend are deployed with execution disabled. Worker replicas stay at 0 until a `worker:main` image exists and execution is intentionally enabled. |
 | `local-llm` | `ghcr.io/chrischang314/local-llm/*:main` | `localllm.lan` | `mac-mini-worker` | Backend reaches Ollama on the Mac host through `host.lima.internal:11434`, aliasing to `192.168.5.2`. |
 | `model-railroad-automation` | `ghcr.io/chrischang314/model-railroad-automation/web-control:main` | `modelrailroadautomation.lan` | `railroad-pi3` | Train web server; talks to DCC-EX at `192.168.4.22:2560`. |
 | `model-trading-bot` | `ghcr.io/chrischang314/model-trading-bot/*:main` | `modeltradingbot.lan` | `mac-mini-worker` | Frontend plus backend with local data PVC. |
 | `pihole` | `pihole/pihole:latest` | `pihole.lan` | `rpi5-control` | DNS on port 53, web via ingress. Config paths are `/srv/pihole/etc-pihole` and `/srv/pihole/etc-dnsmasq.d`. |
-| `postgres` | `pgvector/pgvector:pg16` | internal only | `mac-mini-worker` | Shared PostgreSQL/pgvector database for recruiting app. |
-| `recruiting-app` | `ghcr.io/chrischang314/recruiting-app/*:main` | `recruitingapp.lan` | `mac-mini-worker` | API, LAN frontend, public `/recruiting-app` frontend, scraper. The public frontend is a separate `frontend-public` service using `ghcr.io/chrischang314/recruiting-app/frontend:public`, built with `NEXT_PUBLIC_BASE_PATH=/recruiting-app` for the `chriswchang.com/recruiting-app` proxy. 1point3acres requires a copied `data/storage_state.json`, but it is disabled while the current session returns `user_banned` / "用户组: 不准访问". Active scraper sources are Hacker News + Reddit with embeddings/OCR enabled and a faster public-source profile. |
+| `postgres` | `pgvector/pgvector:pg16` | internal only | `mac-mini-worker` | Shared PostgreSQL/pgvector database for recruiting app. Uses the `postgres-postgres-pgdata` PVC on the default `synology-nfs` StorageClass, `imagePullPolicy: IfNotPresent`, a 1 GiB memory limit, and readiness/startup probes only. Do not add a liveness probe unless there is a proven restart-safe failure mode. |
+| `recruiting-app` | `ghcr.io/chrischang314/recruiting-app/*:main` | `recruitingapp.lan` | `mac-mini-worker` | API, LAN frontend, public `/recruiting-app` frontend, scraper. The public frontend is a separate `frontend-public` service using `ghcr.io/chrischang314/recruiting-app/frontend-public:main`, built with `NEXT_PUBLIC_BASE_PATH=/recruiting-app` for the `chriswchang.com/recruiting-app` proxy. 1point3acres requires a copied `data/storage_state.json`, but it is disabled while the current session returns `user_banned` / "用户组: 不准访问". Active scraper sources are Hacker News + Reddit with embeddings enabled; OCR is paused on the Mac Mini to avoid memory pressure with BGE-M3. |
 | `csb1-ota-updater` | `ghcr.io/chrischang314/model-railroad-csb1-updater:latest` | none | `railroad-pi3` | Runs in namespace `railroad`; used for train hardware support. |
 
 Legacy LoadBalancer service ports still exist for compatibility:
@@ -165,7 +167,7 @@ Current local-cache PVC-backed workloads:
 
 | PVC | Current purpose |
 |---|---|
-| `postgres-postgres-pgdata-nfs` | Recruiting PostgreSQL database on Synology NFS |
+| `postgres-postgres-pgdata` | Recruiting PostgreSQL database on Synology NFS |
 | `model-trading-bot-backend-data-nfs` | Trading bot backend data on Synology NFS |
 | `trading-bot-public-cache` | Public trading-bot dashboard cache; synced back to `trading-bot-parquet` by `trading-bot-cache-sync` |
 | `local-llm-backend-data-nfs` | Local LLM app data on Synology NFS |
@@ -182,7 +184,7 @@ careful cold copy with the database stopped. For app caches, decide whether
 they can be rebuilt before migrating.
 
 Synology-backed PVCs are currently `trading-bot/trading-bot-parquet`,
-`trading-bot/redis-data-redis-0`, `default/postgres-postgres-pgdata-nfs`,
+`trading-bot/redis-data-redis-0`, `default/postgres-postgres-pgdata`,
 `default/model-trading-bot-backend-data-nfs`, `default/local-llm-backend-data-nfs`,
 `default/recruiting-app-*-nfs`, `local-llm/local-llm-chat-data`, and
 `local-llm/ollama-model-cache`.
