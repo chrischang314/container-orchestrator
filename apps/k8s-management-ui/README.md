@@ -14,7 +14,9 @@ and in-cluster service-account environment variables are present.
 ## Runtime controls
 
 - `GET /api/cluster` reads nodes, pods, containers, and deployments through the
-  Kubernetes API.
+  Kubernetes API, then derives a read-only `attention` summary for offline
+  nodes, cordoned nodes, offline external workers, unready deployments, failed
+  or pending pods, not-ready containers, and high restart counts.
 - `POST /api/action` runs built-in node and deployment controls through a
   validated `kubectl` invocation. Mutating actions require a UI confirmation
   and a backend `confirmed: true` receipt before execution.
@@ -29,4 +31,5 @@ and in-cluster service-account environment variables are present.
 
 Set `K8S_UI_PUBLIC_STATUS=true` for the status-only public deployment. In this
 mode the root page serves a read-only dashboard, `GET /api/cluster` returns a
-sanitized aggregate snapshot, and command/action endpoints return `403`.
+sanitized aggregate snapshot with a sanitized attention subset, and
+command/action endpoints return `403`.

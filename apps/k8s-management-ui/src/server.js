@@ -16,6 +16,12 @@ const CONTENT_TYPES = new Map([
   [".png", "image/png"],
   [".svg", "image/svg+xml; charset=utf-8"]
 ]);
+const PUBLIC_ATTENTION_KINDS = new Set([
+  "node-offline",
+  "node-cordoned",
+  "external-worker-offline",
+  "deployment-unready"
+]);
 
 function createServer(options = {}) {
   const env = options.env || process.env;
@@ -97,7 +103,7 @@ function publicClusterSnapshot(snapshot) {
   const rawNodes = snapshot.nodes || [];
   const rawDeployments = snapshot.deployments || [];
   const rawExternalWorkers = snapshot.externalWorkers || [];
-  const rawPods = rawNodes.flatMap((node) => node.pods || []);
+  const rawPods = snapshot.pods || rawNodes.flatMap((node) => node.pods || []);
   const namespaces = new Map();
 
   for (const pod of rawPods) {
@@ -155,6 +161,7 @@ function publicClusterSnapshot(snapshot) {
       nodes: onlineNodes === nodes.length ? "healthy" : "attention",
       workloads: readyDeployments === rawDeployments.length ? "healthy" : "attention"
     },
+    attention: publicAttention(snapshot.attention),
     nodes,
     externalWorkers: rawExternalWorkers.map((worker) => ({
       name: worker.name,
@@ -163,6 +170,31 @@ function publicClusterSnapshot(snapshot) {
       actualState: worker.actualState
     })),
     namespaces: namespaceRows
+  };
+}
+
+function publicAttention(attention = {}) {
+  const issues = (attention.issues || [])
+    .filter((item) => PUBLIC_ATTENTION_KINDS.has(item.kind))
+    .map((item) => ({
+      id: item.id,
+      severity: item.severity,
+      kind: item.kind,
+      title: item.title,
+      detail: item.detail,
+      namespace: item.namespace,
+      name: item.name,
+      node: item.node,
+      deployment: item.deployment
+    }));
+
+  return {
+    total: issues.length,
+    critical: issues.filter((item) => item.severity === "critical").length,
+    warning: issues.filter((item) => item.severity === "warning").length,
+    info: issues.filter((item) => item.severity === "info").length,
+    highestSeverity: issues[0]?.severity || "healthy",
+    issues
   };
 }
 
@@ -261,6 +293,7 @@ if (require.main === module) {
 
 module.exports = {
   createServer,
+  publicAttention,
   publicClusterSnapshot,
   requireMutationConfirmation,
   readJson

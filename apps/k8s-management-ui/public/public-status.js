@@ -8,6 +8,7 @@ const state = {
 const els = {
   clusterMode: document.querySelector("[data-testid='cluster-mode']"),
   summaryStrip: document.getElementById("summaryStrip"),
+  attentionPanel: document.getElementById("attentionPanel"),
   lastUpdated: document.getElementById("lastUpdated"),
   namespaceCount: document.getElementById("namespaceCount"),
   namespaceRows: document.getElementById("namespaceRows"),
@@ -29,6 +30,16 @@ async function refreshCluster() {
   } catch (error) {
     els.clusterMode.textContent = "unreachable";
     els.summaryStrip.innerHTML = `<div class="metric"><span>Status</span><strong>Offline</strong></div>`;
+    els.attentionPanel.className = "attention-panel critical";
+    els.attentionPanel.innerHTML = `
+      <div class="attention-summary">
+        <div>
+          <h2>Active Attention</h2>
+          <p>${escapeHtml(error.message)}</p>
+        </div>
+        <span class="status-pill critical">offline</span>
+      </div>
+    `;
     els.nodeList.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
     els.namespaceRows.innerHTML = `<tr><td colspan="5" class="empty-state">Cluster status unavailable</td></tr>`;
   } finally {
@@ -39,6 +50,7 @@ async function refreshCluster() {
 function render() {
   if (!state.snapshot) return;
   renderSummary();
+  renderAttention();
   renderNodes();
   renderNamespaces();
 }
@@ -62,6 +74,51 @@ function renderSummary() {
     </div>
   `).join("");
   els.lastUpdated.textContent = formatTime(state.snapshot.generatedAt);
+}
+
+function renderAttention() {
+  const attention = state.snapshot.attention || { total: 0, issues: [] };
+  const issues = attention.issues || [];
+  const total = Number(attention.total || issues.length);
+  els.attentionPanel.className = `attention-panel ${total ? attention.highestSeverity || "warning" : "healthy"}`;
+
+  if (!total) {
+    els.attentionPanel.innerHTML = `
+      <div class="attention-summary">
+        <div>
+          <h2>Active Attention</h2>
+          <p>No public cluster status issues detected.</p>
+        </div>
+        <span class="status-pill ready">healthy</span>
+      </div>
+    `;
+    return;
+  }
+
+  els.attentionPanel.innerHTML = `
+    <div class="attention-summary">
+      <div>
+        <h2>Active Attention</h2>
+        <p>${escapeHtml(total)} sanitized issue${total === 1 ? "" : "s"} visible from public status.</p>
+      </div>
+      <span class="status-pill ${escapeAttr(attention.highestSeverity || "warning")}">${escapeHtml(attention.highestSeverity || "warning")}</span>
+    </div>
+    <div class="attention-list">
+      ${issues.slice(0, 4).map(issueRow).join("")}
+    </div>
+  `;
+}
+
+function issueRow(issue) {
+  return `
+    <article class="attention-item">
+      <span class="status-pill ${escapeAttr(issue.severity)}">${escapeHtml(issue.severity)}</span>
+      <div>
+        <h3>${escapeHtml(issue.title)}</h3>
+        <p>${escapeHtml(issue.detail)}</p>
+      </div>
+    </article>
+  `;
 }
 
 function renderNodes() {
@@ -153,6 +210,10 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll("\"", "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value);
 }
 
 els.refreshButton.addEventListener("click", refreshCluster);

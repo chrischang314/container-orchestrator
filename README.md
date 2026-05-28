@@ -54,7 +54,7 @@ numbers:
 | `http://projects.lan/` | Homelab launchpad and portfolio preview. `homewebsite.lan` redirects here. | Mac Mini worker |
 | `http://homeassistant.lan/` | Home Assistant UI | Raspberry Pi 5 control plane |
 | `http://homebridge.lan/` | Homebridge UI | Raspberry Pi 5 control plane |
-| `http://k8s.lan/` | Kubernetes cluster management UI | Raspberry Pi 5 control plane |
+| `http://k8s.lan/` | Kubernetes cluster management UI with a read-only active attention summary | Raspberry Pi 5 control plane |
 | `http://localllm.lan/` | Local LLM chat frontend | Mac Mini worker |
 | `http://modelrailroadautomation.lan/` | Railroad control web server | Railroad Pi worker |
 | `http://modeltradingbot.lan/` | Trading bot frontend | Mac Mini worker |
@@ -262,3 +262,8 @@ The LAN `k8s-management-ui` requires an explicit confirmation step for
 mutating cluster actions and typed mutating `kubectl` commands. The backend
 also rejects unconfirmed mutations, so the dialog is an operator-safety layer on
 top of server-side enforcement.
+
+The same UI now derives a read-only active attention summary from `/api/cluster`
+so offline nodes, cordoned nodes, offline external workers, unready deployments,
+failed or pending pods, not-ready containers, and high restart counts are
+visible before drilling into the node and deployment tables.

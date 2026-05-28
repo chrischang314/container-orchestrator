@@ -67,7 +67,8 @@ button:disabled {
 
 .topbar,
 .workspace,
-.summary-strip {
+.summary-strip,
+.attention-panel {
   max-width: 1440px;
   margin: 0 auto;
 }
@@ -133,6 +134,73 @@ h2 {
   gap: 12px;
   grid-template-columns: repeat(7, minmax(110px, 1fr));
   margin-bottom: 16px;
+}
+
+.attention-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--green);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  margin-bottom: 16px;
+  padding: 14px 16px;
+}
+
+.attention-panel.warning {
+  border-left-color: var(--amber);
+}
+
+.attention-panel.critical {
+  border-left-color: var(--red);
+}
+
+.attention-summary {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.attention-summary p,
+.attention-item p {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  margin-top: 4px;
+}
+
+.attention-list {
+  display: grid;
+  margin-top: 10px;
+}
+
+.attention-item {
+  align-items: start;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto 1fr;
+  min-width: 0;
+  padding: 10px 0;
+}
+
+.attention-item h3 {
+  font-size: 0.95rem;
+  line-height: 1.25;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.attention-meta,
+.attention-more {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.attention-more {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
 }
 
 .metric {
@@ -305,15 +373,23 @@ h2 {
 }
 
 .status-pill.offline,
-.status-pill.blocked {
+.status-pill.blocked,
+.status-pill.critical {
   background: var(--red-soft);
   color: var(--red);
 }
 
 .status-pill.paused,
-.status-pill.pending {
+.status-pill.pending,
+.status-pill.warning {
   background: var(--amber-soft);
   color: var(--amber);
+}
+
+.status-pill.info,
+.status-pill.healthy {
+  background: var(--blue-soft);
+  color: var(--blue);
 }
 
 .table-wrap {
