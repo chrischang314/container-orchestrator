@@ -134,7 +134,7 @@ services:
     tag: main
     autoDeploy:
       enabled: false
-    replicas: 1
+    replicas: 0
     nodeSelector:
       kubernetes.io/hostname: mac-mini-worker
     env:

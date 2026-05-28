@@ -19,7 +19,7 @@ metadata:
     {{- toYaml . | nindent 4 }}
     {{- end }}
 spec:
-  replicas: {{ default 1 $svc.replicas }}
+  replicas: {{- if hasKey $svc "replicas" }} {{ $svc.replicas }}{{- else }} 1{{- end }}
   {{- if $svc.strategy }}
   strategy:
     {{- toYaml $svc.strategy | nindent 4 }}
