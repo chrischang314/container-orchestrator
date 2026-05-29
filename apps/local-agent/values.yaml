@@ -22,14 +22,12 @@ services:
       enabled: false
     port: 8000
     replicas: 1
+    # The Mac Mini worker cannot reliably schedule a second backend pod during
+    # a rolling-update surge, so replace this singleton in place.
     strategy:
       type: Recreate
     nodeSelector:
       kubernetes.io/hostname: mac-mini-worker
-    # The Mac Mini worker cannot reliably schedule a second 2Gi backend pod
-    # during a rolling-update surge, so replace this singleton in place.
-    strategy:
-      type: Recreate
     env:
       - name: LOCAL_AGENT_DATABASE_PATH
         value: /app/data/local-agent.sqlite3
