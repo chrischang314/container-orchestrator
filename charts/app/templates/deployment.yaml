@@ -72,7 +72,11 @@ spec:
       {{- end }}
       containers:
         - name: {{ $svc.name }}
+          {{- if $svc.digest }}
+          image: "{{ $svc.image }}@{{ $svc.digest }}"
+          {{- else }}
           image: "{{ $svc.image }}:{{ default "main" $svc.tag }}"
+          {{- end }}
           imagePullPolicy: {{ default "Always" $svc.imagePullPolicy }}
           {{- if $svc.command }}
           command: {{ toYaml $svc.command | nindent 12 }}

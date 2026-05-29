@@ -7,6 +7,9 @@ nameOverride: local-agent
 imagePullSecrets:
   - name: ghcr-creds
 
+productionImagePolicy:
+  requireDigestBeforeExecution: true
+
 serviceAccount:
   create: false
   automountServiceAccountToken: false
@@ -14,10 +17,11 @@ serviceAccount:
 services:
   - name: backend
     serviceAccountName: local-agent-backend
-    automountServiceAccountToken: false
+    automountServiceAccountToken: true
     serviceName: local-agent-backend
     image: ghcr.io/chrischang314/local-agent/backend
     tag: main
+    digest: "sha256:57f46fe09f543b6e6763fd6e4b6565e394c58deae304e55bcda46ce4d67e8295"
     autoDeploy:
       enabled: false
     port: 8000
@@ -35,6 +39,10 @@ services:
         value: /app/data/retrieval-store.json
       - name: LOCAL_AGENT_CHROMA_PATH
         value: /app/data/chroma
+      - name: LOCAL_AGENT_MEMORY_STORE_PATH
+        value: /app/data/memory-store.json
+      - name: LOCAL_AGENT_COGNEE_PATH
+        value: /app/data/cognee
       - name: LOCAL_AGENT_OPTIMIZATION_STORE_PATH
         value: /app/data/optimization-store.json
       - name: SHARED_AUTH_DB
@@ -47,6 +55,34 @@ services:
         value: "true"
       - name: LOCAL_AGENT_AGENT_EXECUTION_ENABLED
         value: "false"
+      - name: LOCAL_AGENT_DESKTOP_ISOLATION_ENABLED
+        value: "false"
+      - name: LOCAL_AGENT_DESKTOP_ISOLATION_BACKEND
+        value: synthetic
+      - name: LOCAL_AGENT_GRAPH_CHECKPOINT_PATH
+        value: /app/data/langgraph-checkpoints.sqlite
+      - name: LOCAL_AGENT_WORKER_SERVICE_URL
+        value: http://local-agent-worker:8080
+      - name: LOCAL_AGENT_WORKER_DISPATCH_PATH
+        value: /execute
+      - name: LOCAL_AGENT_WORKER_REQUEST_TIMEOUT_SECONDS
+        value: "180"
+      - name: LOCAL_AGENT_WORKER_AUTH_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: local-agent-worker-auth
+            key: token
+            optional: true
+      - name: LOCAL_AGENT_MODEL_WORKER_NAMESPACE
+        value: local-agent-model-workers
+      - name: LOCAL_AGENT_MODEL_WORKER_SWITCH_LABEL
+        value: app.kubernetes.io/component=external-worker-switch
+      - name: LOCAL_AGENT_MODEL_ENDPOINTS
+        valueFrom:
+          configMapKeyRef:
+            name: local-agent-external-model-endpoints
+            key: MODEL_ENDPOINTS
+            optional: true
       - name: LOCAL_AGENT_CLOUD_FALLBACK_ENABLED
         value: "false"
       - name: LOCAL_AGENT_ADMIN_TOKEN
@@ -104,6 +140,7 @@ services:
     serviceName: local-agent-frontend
     image: ghcr.io/chrischang314/local-agent/frontend
     tag: main
+    digest: "sha256:fa3dfe58f2af8aadc783578ef1fc2fb26e9cfa0f60571d8e2479d9845ae6e636"
     autoDeploy:
       enabled: false
     serviceType: LoadBalancer
@@ -137,13 +174,15 @@ services:
   - name: worker
     serviceAccountName: local-agent-worker
     automountServiceAccountToken: false
+    serviceName: local-agent-worker
     image: ghcr.io/chrischang314/local-agent/worker
     tag: main
+    digest: "sha256:244892739a85c55b871a2c0cdff5f2852c60a540f75ef2a358dfec993187e948"
     autoDeploy:
       enabled: false
-    # The current control-plane deployment keeps execution disabled and there is
-    # no published worker:main image yet. Scale this up only after that image
-    # exists and worker execution is intentionally enabled.
+    port: 8080
+    # The current control-plane deployment keeps execution disabled. Scale this
+    # up only after worker execution is intentionally enabled.
     replicas: 0
     nodeSelector:
       kubernetes.io/hostname: mac-mini-worker
@@ -156,10 +195,24 @@ services:
         value: "false"
       - name: LOCAL_AGENT_WORKER_DESKTOP_BACKEND
         value: synthetic
+      - name: LOCAL_AGENT_WORKER_DESKTOP_VNC_HOST
+        value: ""
+      - name: LOCAL_AGENT_WORKER_DESKTOP_ALLOWED_VNC_HOSTS
+        value: "local-agent-desktop-sandbox.local-agent-sandbox.svc.cluster.local,local-agent-desktop-sandbox"
+      - name: LOCAL_AGENT_WORKER_DESKTOP_VNC_PORT
+        value: "5900"
       - name: LOCAL_AGENT_WORKER_MCP_ENABLED
         value: "false"
       - name: LOCAL_AGENT_WORKER_SMOLAGENTS_ENABLED
         value: "false"
+      - name: LOCAL_AGENT_WORKER_WEB_ENABLED
+        value: "false"
+      - name: LOCAL_AGENT_WORKER_AUTH_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: local-agent-worker-auth
+            key: token
+            optional: true
       - name: LOCAL_AGENT_WORKER_ARTIFACT_BASE
         value: /worker/artifacts
     resources:

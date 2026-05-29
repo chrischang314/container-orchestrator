@@ -2,7 +2,7 @@
 
 Services:
 {{- range .Values.services }}
-  - {{ .name }}: {{ .image }}:{{ default "main" .tag }}{{ if .port }} (port {{ .port }}){{ end }}
+  - {{ .name }}: {{ .image }}{{ if .digest }}@{{ .digest }}{{ else }}:{{ default "main" .tag }}{{ end }}{{ if .port }} (port {{ .port }}){{ end }}
 {{- end }}
 {{- if .Values.ingress.enabled }}
 

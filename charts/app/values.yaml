@@ -27,6 +27,7 @@ services: []
 #   - name: backend
 #     image: ghcr.io/chrischang314/local-llm/backend
 #     tag: main                   # poll target
+#     digest: ""                  # optional sha256:... pin; overrides tag
 #     resourceName: ""            # optional: Deployment/PVC base name override
 #     port: 8000                  # Service port; omitted = no Service
 #     containerPort: 8000         # optional; defaults to port
