@@ -23,6 +23,37 @@
       <main>
         <section class="summary-strip" id="summaryStrip" data-testid="summary-strip"></section>
 
+        <section class="capacity-grid" aria-label="Cluster capacity">
+          <article class="capacity-panel">
+            <div class="section-heading">
+              <h2>Node Pressure</h2>
+              <span id="capacityStatus">metrics pending</span>
+            </div>
+            <div class="capacity-node-list" id="capacityNodeList"></div>
+          </article>
+
+          <article class="capacity-panel">
+            <div class="section-heading">
+              <h2>Top Memory Pods</h2>
+              <span>read-only</span>
+            </div>
+            <div class="table-wrap">
+              <table class="capacity-table">
+                <thead>
+                  <tr>
+                    <th>Namespace</th>
+                    <th>Pod</th>
+                    <th>Node</th>
+                    <th>Memory</th>
+                    <th>CPU</th>
+                  </tr>
+                </thead>
+                <tbody id="topPodRows"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
         <section class="workspace">
           <div class="topology-panel">
             <div class="section-heading">

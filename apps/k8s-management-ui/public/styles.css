@@ -67,6 +67,7 @@ button:disabled {
 
 .topbar,
 .workspace,
+.capacity-grid,
 .summary-strip {
   max-width: 1440px;
   margin: 0 auto;
@@ -165,6 +166,14 @@ h2 {
   margin-bottom: 16px;
 }
 
+.capacity-grid {
+  align-items: stretch;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(420px, 0.95fr) minmax(520px, 1.05fr);
+  margin-bottom: 16px;
+}
+
 .public-status-grid {
   align-items: stretch;
   display: grid;
@@ -181,7 +190,8 @@ h2 {
 .topology-panel,
 .details-panel,
 .deployments-panel,
-.console-panel {
+.console-panel,
+.capacity-panel {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -229,13 +239,19 @@ h2 {
   gap: 10px;
 }
 
+.capacity-node-list {
+  display: grid;
+  gap: 10px;
+}
+
 .public-node-list {
   display: grid;
   gap: 10px;
 }
 
 .node-card,
-.external-worker-card {
+.external-worker-card,
+.capacity-node-row {
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -247,6 +263,46 @@ h2 {
 
 .node-card {
   cursor: pointer;
+}
+
+.capacity-meter {
+  display: grid;
+  gap: 6px;
+}
+
+.capacity-meter-label {
+  color: var(--muted);
+  display: flex;
+  font-size: 0.82rem;
+  gap: 8px;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.capacity-meter-label span {
+  overflow-wrap: anywhere;
+}
+
+.capacity-bar {
+  background: var(--panel-soft);
+  border-radius: 999px;
+  height: 8px;
+  overflow: hidden;
+}
+
+.capacity-bar span {
+  background: var(--green);
+  display: block;
+  height: 100%;
+  min-width: 2px;
+}
+
+.capacity-node-row.pending .capacity-bar span {
+  background: var(--amber);
+}
+
+.capacity-node-row.blocked .capacity-bar span {
+  background: var(--red);
 }
 
 .public-node-card {
@@ -324,6 +380,35 @@ table {
   border-collapse: collapse;
   min-width: 780px;
   width: 100%;
+}
+
+.capacity-table {
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.capacity-table th:nth-child(1),
+.capacity-table td:nth-child(1) {
+  width: 15%;
+}
+
+.capacity-table th:nth-child(2),
+.capacity-table td:nth-child(2) {
+  overflow-wrap: anywhere;
+  width: 36%;
+}
+
+.capacity-table th:nth-child(3),
+.capacity-table td:nth-child(3) {
+  overflow-wrap: anywhere;
+  width: 24%;
+}
+
+.capacity-table th:nth-child(4),
+.capacity-table td:nth-child(4),
+.capacity-table th:nth-child(5),
+.capacity-table td:nth-child(5) {
+  width: 12.5%;
 }
 
 .status-table {
@@ -445,6 +530,7 @@ pre {
   }
 
   .workspace,
+  .capacity-grid,
   .public-status-grid,
   .lower-grid {
     grid-template-columns: 1fr;

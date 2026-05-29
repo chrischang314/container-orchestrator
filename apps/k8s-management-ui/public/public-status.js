@@ -74,6 +74,8 @@ function renderNodes() {
   els.nodeList.innerHTML = nodes.map((node) => {
     const status = node.online ? "online" : "offline";
     const schedulable = node.schedulable ? "ready" : "paused";
+    const memoryPercent = node.capacity?.memory?.percentUsed;
+    const memoryLabel = Number.isFinite(memoryPercent) ? `${memoryPercent}% memory` : "memory unknown";
     return `
       <article class="public-node-card">
         <div class="node-topline">
@@ -87,6 +89,7 @@ function renderNodes() {
         </div>
         <div class="node-stats">
           <span>${escapeHtml(node.podCount)} pods / ${escapeHtml(node.containerCount)} containers</span>
+          <span>${escapeHtml(memoryLabel)}</span>
           <span class="status-pill ${schedulable}">${node.schedulable ? "schedulable" : "cordoned"}</span>
         </div>
       </article>

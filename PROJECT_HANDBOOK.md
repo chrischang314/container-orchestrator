@@ -17,6 +17,12 @@ deployments behind `projects.lan`.
 `apps/k8s-management-ui` is a LAN-only operations console for cluster state and
 allowlisted `kubectl` controls.
 
+- `/api/cluster` includes a read-only `capacity` object when Metrics API access
+  is available. It reports node CPU/memory pressure and top memory-consuming
+  pods; if `metrics.k8s.io` is unavailable or denied, the API still returns the
+  rest of the cluster snapshot with `capacity.available=false`.
+- The public `k8s-cluster-status` deployment may show node-level capacity
+  summaries, but it must not expose detailed top-pod names.
 - Read-only commands and status actions run directly.
 - Mutating built-in actions and typed mutating commands open a confirmation
   dialog before any network request is sent.

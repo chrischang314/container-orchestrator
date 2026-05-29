@@ -99,6 +99,7 @@ function publicClusterSnapshot(snapshot) {
   const rawExternalWorkers = snapshot.externalWorkers || [];
   const rawPods = rawNodes.flatMap((node) => node.pods || []);
   const namespaces = new Map();
+  const capacityByNode = new Map((snapshot.capacity?.nodes || []).map((node) => [node.name, node]));
 
   for (const pod of rawPods) {
     const item = ensureNamespace(namespaces, pod.namespace || "default");
@@ -124,7 +125,8 @@ function publicClusterSnapshot(snapshot) {
     kubeletVersion: node.kubeletVersion,
     architecture: node.architecture,
     podCount: Number(node.podCount || 0),
-    containerCount: Number(node.containerCount || 0)
+    containerCount: Number(node.containerCount || 0),
+    capacity: publicNodeCapacity(capacityByNode.get(node.name))
   }));
 
   const namespaceRows = Array.from(namespaces.values()).sort((left, right) =>
@@ -156,6 +158,7 @@ function publicClusterSnapshot(snapshot) {
       workloads: readyDeployments === rawDeployments.length ? "healthy" : "attention"
     },
     nodes,
+    capacity: publicCapacitySnapshot(snapshot.capacity),
     externalWorkers: rawExternalWorkers.map((worker) => ({
       name: worker.name,
       online: Boolean(worker.online),
@@ -163,6 +166,37 @@ function publicClusterSnapshot(snapshot) {
       actualState: worker.actualState
     })),
     namespaces: namespaceRows
+  };
+}
+
+function publicNodeCapacity(capacity) {
+  if (!capacity) return undefined;
+  return {
+    cpu: {
+      usageDisplay: capacity.cpu?.usageDisplay || "",
+      percentUsed: capacity.cpu?.percentUsed ?? null
+    },
+    memory: {
+      usageDisplay: capacity.memory?.usageDisplay || "",
+      percentUsed: capacity.memory?.percentUsed ?? null
+    },
+    severity: capacity.severity || "unknown"
+  };
+}
+
+function publicCapacitySnapshot(capacity) {
+  if (!capacity) return undefined;
+  return {
+    available: Boolean(capacity.available),
+    source: capacity.source,
+    message: capacity.available ? capacity.message : "Metrics API unavailable.",
+    summary: {
+      nodeCount: Number(capacity.summary?.nodeCount || 0),
+      topPodCount: Number(capacity.summary?.topPodCount || 0),
+      elevatedMemoryNodes: Number(capacity.summary?.elevatedMemoryNodes || 0),
+      highMemoryNodes: Number(capacity.summary?.highMemoryNodes || 0),
+      maxMemoryPercent: capacity.summary?.maxMemoryPercent ?? null
+    }
   };
 }
 

@@ -10,6 +10,9 @@ const state = {
 const els = {
   clusterMode: document.querySelector("[data-testid='cluster-mode']"),
   summaryStrip: document.getElementById("summaryStrip"),
+  capacityStatus: document.getElementById("capacityStatus"),
+  capacityNodeList: document.getElementById("capacityNodeList"),
+  topPodRows: document.getElementById("topPodRows"),
   nodeMap: document.getElementById("nodeMap"),
   lastUpdated: document.getElementById("lastUpdated"),
   selectedNodeLabel: document.getElementById("selectedNodeLabel"),
@@ -52,6 +55,7 @@ async function refreshCluster() {
 function render() {
   if (!state.snapshot) return;
   renderSummary();
+  renderCapacity();
   renderNodes();
   renderContainers();
   renderDeployments();
@@ -76,6 +80,90 @@ function renderSummary() {
     </div>
   `).join("");
   els.lastUpdated.textContent = formatTime(state.snapshot.generatedAt);
+}
+
+function renderCapacity() {
+  const capacity = state.snapshot.capacity;
+  if (!capacity) {
+    els.capacityStatus.textContent = "metrics unavailable";
+    els.capacityStatus.className = "status-pill pending";
+    els.capacityNodeList.innerHTML = `<div class="empty-state">No capacity data available</div>`;
+    els.topPodRows.innerHTML = `<tr><td colspan="5" class="empty-state">No pod metrics available</td></tr>`;
+    return;
+  }
+
+  const severity = capacity.summary?.highMemoryNodes > 0
+    ? "high"
+    : capacity.summary?.elevatedMemoryNodes > 0
+      ? "elevated"
+      : "normal";
+  els.capacityStatus.textContent = capacity.available ? `${capacity.summary?.nodeCount || 0} nodes` : "metrics unavailable";
+  els.capacityStatus.className = `status-pill ${capacity.available ? severityClass(severity) : "pending"}`;
+
+  const nodes = capacity.nodes || [];
+  if (!nodes.length) {
+    const message = capacity.message || "No node metrics available";
+    els.capacityNodeList.innerHTML = `<div class="empty-state">${escapeHtml(message)}</div>`;
+  } else {
+    els.capacityNodeList.innerHTML = nodes.map(capacityNodeRow).join("");
+  }
+
+  const topPods = capacity.topPods || [];
+  if (!topPods.length) {
+    els.topPodRows.innerHTML = `<tr><td colspan="5" class="empty-state">No pod metrics available</td></tr>`;
+    return;
+  }
+
+  els.topPodRows.innerHTML = topPods.map((pod) => `
+    <tr>
+      <td>${escapeHtml(pod.namespace)}</td>
+      <td>${escapeHtml(pod.name)}</td>
+      <td>${escapeHtml(pod.nodeName || "--")}</td>
+      <td>${escapeHtml(pod.memory?.usageDisplay || "--")}</td>
+      <td>${escapeHtml(pod.cpu?.usageDisplay || "--")}</td>
+    </tr>
+  `).join("");
+}
+
+function capacityNodeRow(node) {
+  const memoryPercent = boundedPercent(node.memory?.percentUsed);
+  const cpuPercent = boundedPercent(node.cpu?.percentUsed);
+  const severity = severityClass(node.severity);
+  return `
+    <article class="capacity-node-row ${severity}">
+      <div class="node-topline">
+        <span class="node-name">${escapeHtml(node.name)}</span>
+        <span class="status-pill ${severity}">${escapeHtml(node.severity || "unknown")}</span>
+      </div>
+      ${capacityMeter("Memory", node.memory?.usageDisplay, node.memory?.basisDisplay, memoryPercent, node.memory?.percentUsed)}
+      ${capacityMeter("CPU", node.cpu?.usageDisplay, node.cpu?.basisDisplay, cpuPercent, node.cpu?.percentUsed)}
+    </article>
+  `;
+}
+
+function capacityMeter(label, usage, basis, width, percent) {
+  const value = Number.isFinite(percent) ? `${percent}%` : "--";
+  return `
+    <div class="capacity-meter">
+      <div class="capacity-meter-label">
+        <span>${escapeHtml(label)}</span>
+        <span>${escapeHtml(usage || "--")} / ${escapeHtml(basis || "--")} (${escapeHtml(value)})</span>
+      </div>
+      <div class="capacity-bar" aria-hidden="true"><span style="width: ${width}%"></span></div>
+    </div>
+  `;
+}
+
+function boundedPercent(value) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, value));
+}
+
+function severityClass(severity) {
+  if (severity === "high") return "blocked";
+  if (severity === "elevated") return "pending";
+  if (severity === "normal") return "ready";
+  return "paused";
 }
 
 function renderNodes() {
