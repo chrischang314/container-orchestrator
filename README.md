@@ -55,7 +55,7 @@ numbers:
 | `http://homeassistant.lan/` | Home Assistant UI | Raspberry Pi 5 control plane |
 | `http://homebridge.lan/` | Homebridge UI | Raspberry Pi 5 control plane |
 | `http://k8s.lan/` | Kubernetes cluster management UI | Raspberry Pi 5 control plane |
-| `http://localagent.lan/` | Local Agent control UI | Mac Mini worker |
+| `http://localagent.lan/` | Local Agent control UI; backend uses a Recreate rollout to avoid Mac Mini memory-pressure surges. | Mac Mini worker |
 | `http://localllm.lan/` | Local LLM chat frontend | Mac Mini worker |
 | `http://modelrailroadautomation.lan/` | Railroad control web server | Railroad Pi worker |
 | `http://modeltradingbot.lan/` | Trading bot frontend | Mac Mini worker |
@@ -261,6 +261,11 @@ Synology, but it should not be on the critical startup path for
 2. [Keel](https://keel.sh) polls GHCR every 5 minutes. When `:main`'s digest
    changes, Keel triggers a rolling update of the matching Deployment.
 3. Stateful pods retain their PVCs across the rollout.
+
+Local Agent is an exception to the default rolling-update strategy: its backend
+is a singleton pinned to `mac-mini-worker` with a 2 GiB memory limit, so
+`apps/local-agent/values.yaml` uses `strategy.type: Recreate` to prevent a
+second backend pod from being scheduled during a surge.
 
 The in-repo `k8s-management-ui` workflow builds and pushes
 `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` from this
