@@ -24,6 +24,14 @@ services:
         value: "2560"
       - name: DCCEX_MOCK
         value: "false"
+      - name: FIRMWARE_STATUS_FILE
+        value: /state/firmware-status.json
+      - name: FIRMWARE_STATUS_STALE_MS
+        value: "604800000"
+    persistence:
+      - name: updater-state
+        hostPath: /var/lib/csb1-ota-updater/state
+        mountPath: /state
     resources:
       requests:
         cpu: 25m
