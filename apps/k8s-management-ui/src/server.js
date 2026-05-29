@@ -162,7 +162,27 @@ function publicClusterSnapshot(snapshot) {
       desiredState: worker.desiredState,
       actualState: worker.actualState
     })),
-    namespaces: namespaceRows
+    namespaces: namespaceRows,
+    capacity: publicCapacitySnapshot(snapshot.capacity)
+  };
+}
+
+function publicCapacitySnapshot(capacity = {}) {
+  const nodes = capacity.nodes || [];
+  return {
+    available: Boolean(capacity.available),
+    reason: capacity.available ? "" : capacity.reason || "Metrics API unavailable.",
+    nodePressure: nodes.map((node) => ({
+      name: node.name,
+      cpuPercentUsed: node.cpu?.percentUsed ?? null,
+      memoryPercentUsed: node.memory?.percentUsed ?? null,
+      memorySeverity: node.memory?.severity || "unknown"
+    })),
+    summary: {
+      normalNodes: nodes.filter((node) => node.memory?.severity === "normal").length,
+      elevatedNodes: nodes.filter((node) => node.memory?.severity === "elevated").length,
+      highNodes: nodes.filter((node) => node.memory?.severity === "high").length
+    }
   };
 }
 
@@ -261,6 +281,7 @@ if (require.main === module) {
 
 module.exports = {
   createServer,
+  publicCapacitySnapshot,
   publicClusterSnapshot,
   requireMutationConfirmation,
   readJson

@@ -67,6 +67,7 @@ button:disabled {
 
 .topbar,
 .workspace,
+.capacity-panel,
 .summary-strip {
   max-width: 1440px;
   margin: 0 auto;
@@ -181,13 +182,119 @@ h2 {
 .topology-panel,
 .details-panel,
 .deployments-panel,
-.console-panel {
+.console-panel,
+.capacity-panel {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: var(--shadow);
   min-width: 0;
   padding: 16px;
+}
+
+.capacity-panel {
+  margin-bottom: 16px;
+}
+
+.capacity-layout {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(360px, 0.95fr) minmax(520px, 1.05fr);
+}
+
+.capacity-node-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.capacity-node {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.capacity-bars {
+  display: grid;
+  gap: 10px;
+}
+
+.capacity-bar-row {
+  display: grid;
+  gap: 6px;
+}
+
+.capacity-bar-label {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  font-size: 0.82rem;
+  justify-content: space-between;
+}
+
+.capacity-bar-label strong {
+  color: var(--ink);
+}
+
+.capacity-bar-track {
+  background: var(--panel-soft);
+  border-radius: 999px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.capacity-bar-track span {
+  background: var(--blue);
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+}
+
+.capacity-bar-detail {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.capacity-pods h3 {
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0;
+  margin: 0 0 10px;
+  text-transform: uppercase;
+}
+
+.capacity-table {
+  min-width: 0;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.capacity-table th,
+.capacity-table td {
+  overflow-wrap: anywhere;
+}
+
+.capacity-table th:nth-child(1),
+.capacity-table td:nth-child(1) {
+  width: 16%;
+}
+
+.capacity-table th:nth-child(2),
+.capacity-table td:nth-child(2) {
+  width: 36%;
+}
+
+.capacity-table th:nth-child(3),
+.capacity-table td:nth-child(3) {
+  width: 22%;
+}
+
+.capacity-table th:nth-child(4),
+.capacity-table td:nth-child(4),
+.capacity-table th:nth-child(5),
+.capacity-table td:nth-child(5) {
+  width: 13%;
 }
 
 .section-heading {
@@ -446,6 +553,7 @@ pre {
 
   .workspace,
   .public-status-grid,
+  .capacity-layout,
   .lower-grid {
     grid-template-columns: 1fr;
   }

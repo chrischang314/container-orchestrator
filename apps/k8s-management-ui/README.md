@@ -13,8 +13,10 @@ and in-cluster service-account environment variables are present.
 
 ## Runtime controls
 
-- `GET /api/cluster` reads nodes, pods, containers, and deployments through the
-  Kubernetes API.
+- `GET /api/cluster` reads nodes, pods, containers, deployments, and read-only
+  Metrics API capacity data through the Kubernetes API. If Metrics API access
+  is unavailable, the cluster snapshot still returns with `capacity.available`
+  set to `false`.
 - `POST /api/action` runs built-in node and deployment controls through a
   validated `kubectl` invocation. Mutating actions require a UI confirmation
   and a backend `confirmed: true` receipt before execution.
@@ -30,3 +32,5 @@ and in-cluster service-account environment variables are present.
 Set `K8S_UI_PUBLIC_STATUS=true` for the status-only public deployment. In this
 mode the root page serves a read-only dashboard, `GET /api/cluster` returns a
 sanitized aggregate snapshot, and command/action endpoints return `403`.
+Capacity data in public status mode is limited to node-level pressure
+aggregates and does not include top pod names.

@@ -6,6 +6,7 @@ const https = require("node:https");
 const DEFAULT_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token";
 const DEFAULT_CA_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 const EXTERNAL_WORKER_COMPONENT = "external-worker-switch";
+const TOP_CAPACITY_PODS = 8;
 
 function shouldUseDemoMode(env = process.env) {
   if (env.K8S_UI_DEMO === "true") return true;
@@ -37,6 +38,166 @@ function containerSummary(container, statuses = []) {
     restarts: Number(status.restartCount || 0),
     state: stateName,
     started: Boolean(status.started)
+  };
+}
+
+function parseCpuToMillicores(value) {
+  const text = String(value || "").trim();
+  if (!text) return null;
+  const match = text.match(/^([+-]?\d+(?:\.\d+)?)(n|u|m)?$/);
+  if (!match) return null;
+
+  const amount = Number(match[1]);
+  if (!Number.isFinite(amount)) return null;
+
+  switch (match[2] || "") {
+    case "n":
+      return amount / 1000000;
+    case "u":
+      return amount / 1000;
+    case "m":
+      return amount;
+    default:
+      return amount * 1000;
+  }
+}
+
+function parseMemoryToBytes(value) {
+  const text = String(value || "").trim();
+  if (!text) return null;
+  const match = text.match(/^([+-]?\d+(?:\.\d+)?)(Ki|Mi|Gi|Ti|Pi|Ei|K|M|G|T|P|E)?$/);
+  if (!match) return null;
+
+  const amount = Number(match[1]);
+  if (!Number.isFinite(amount)) return null;
+
+  const unit = match[2] || "";
+  const binary = {
+    Ki: 1024,
+    Mi: 1024 ** 2,
+    Gi: 1024 ** 3,
+    Ti: 1024 ** 4,
+    Pi: 1024 ** 5,
+    Ei: 1024 ** 6
+  };
+  const decimal = {
+    K: 1000,
+    M: 1000 ** 2,
+    G: 1000 ** 3,
+    T: 1000 ** 4,
+    P: 1000 ** 5,
+    E: 1000 ** 6
+  };
+  const multiplier = binary[unit] || decimal[unit] || 1;
+  return amount * multiplier;
+}
+
+function percentOf(usage, basis) {
+  if (!Number.isFinite(usage) || !Number.isFinite(basis) || basis <= 0) return null;
+  return Math.round((usage / basis) * 1000) / 10;
+}
+
+function memorySeverity(percent) {
+  if (!Number.isFinite(percent)) return "unknown";
+  if (percent >= 85) return "high";
+  if (percent >= 70) return "elevated";
+  return "normal";
+}
+
+function cleanErrorMessage(error) {
+  return String(error?.message || error || "Metrics API unavailable.").replace(/\s+/g, " ").slice(0, 220);
+}
+
+function buildCapacitySnapshot(raw, podItems) {
+  const metrics = raw.metrics || {};
+  if (metrics.error) {
+    return {
+      available: false,
+      reason: cleanErrorMessage(metrics.error),
+      nodes: [],
+      topPods: []
+    };
+  }
+
+  const nodeMetrics = metrics.nodes?.items || [];
+  const podMetrics = metrics.pods?.items || [];
+  if (!nodeMetrics.length && !podMetrics.length) {
+    return {
+      available: false,
+      reason: "Metrics API data was not returned.",
+      nodes: [],
+      topPods: []
+    };
+  }
+
+  const nodesByName = new Map((raw.nodes?.items || []).map((node) => [node.metadata?.name || "", node]));
+  const podsByKey = new Map(podItems.map((pod) => [
+    `${pod.metadata?.namespace || "default"}/${pod.metadata?.name || ""}`,
+    pod
+  ]));
+
+  const nodes = nodeMetrics.map((metric) => {
+    const name = metric.metadata?.name || "";
+    const node = nodesByName.get(name) || {};
+    const capacity = node.status?.capacity || {};
+    const allocatable = node.status?.allocatable || {};
+    const cpuUsageMillicores = parseCpuToMillicores(metric.usage?.cpu);
+    const cpuBasisMillicores = parseCpuToMillicores(allocatable.cpu || capacity.cpu);
+    const memoryUsageBytes = parseMemoryToBytes(metric.usage?.memory);
+    const memoryBasisBytes = parseMemoryToBytes(allocatable.memory || capacity.memory);
+    const memoryPercent = percentOf(memoryUsageBytes, memoryBasisBytes);
+
+    return {
+      name,
+      cpu: {
+        usage: metric.usage?.cpu || "",
+        usageMillicores: cpuUsageMillicores,
+        basis: allocatable.cpu || capacity.cpu || "",
+        basisMillicores: cpuBasisMillicores,
+        basisType: allocatable.cpu ? "allocatable" : capacity.cpu ? "capacity" : "unknown",
+        percentUsed: percentOf(cpuUsageMillicores, cpuBasisMillicores)
+      },
+      memory: {
+        usage: metric.usage?.memory || "",
+        usageBytes: memoryUsageBytes,
+        basis: allocatable.memory || capacity.memory || "",
+        basisBytes: memoryBasisBytes,
+        basisType: allocatable.memory ? "allocatable" : capacity.memory ? "capacity" : "unknown",
+        percentUsed: memoryPercent,
+        severity: memorySeverity(memoryPercent)
+      }
+    };
+  }).sort((left, right) => (right.memory.percentUsed || 0) - (left.memory.percentUsed || 0));
+
+  const topPods = podMetrics.map((metric) => {
+    const namespace = metric.metadata?.namespace || "default";
+    const name = metric.metadata?.name || "";
+    const pod = podsByKey.get(`${namespace}/${name}`) || {};
+    const totals = (metric.containers || []).reduce((sum, container) => ({
+      cpuMillicores: sum.cpuMillicores + (parseCpuToMillicores(container.usage?.cpu) || 0),
+      memoryBytes: sum.memoryBytes + (parseMemoryToBytes(container.usage?.memory) || 0)
+    }), { cpuMillicores: 0, memoryBytes: 0 });
+
+    return {
+      namespace,
+      name,
+      node: pod.spec?.nodeName || "",
+      cpu: {
+        usageMillicores: Math.round(totals.cpuMillicores * 1000) / 1000
+      },
+      memory: {
+        usageBytes: Math.round(totals.memoryBytes)
+      }
+    };
+  })
+    .sort((left, right) => right.memory.usageBytes - left.memory.usageBytes)
+    .slice(0, TOP_CAPACITY_PODS);
+
+  return {
+    available: true,
+    reason: "",
+    nodes,
+    topPods
   };
 }
 
@@ -87,6 +248,10 @@ function mapClusterSnapshot(raw, now = new Date()) {
       capacity: {
         cpu: node.status?.capacity?.cpu || "",
         memory: node.status?.capacity?.memory || ""
+      },
+      allocatable: {
+        cpu: node.status?.allocatable?.cpu || "",
+        memory: node.status?.allocatable?.memory || ""
       },
       addresses: node.status?.addresses || [],
       pods,
@@ -158,7 +323,8 @@ function mapClusterSnapshot(raw, now = new Date()) {
     nodes,
     externalWorkers,
     deployments,
-    containers
+    containers,
+    capacity: buildCapacitySnapshot(raw, podItems)
   };
 }
 
@@ -191,14 +357,27 @@ function createKubernetesClient(options = {}) {
   return {
     mode: "cluster",
     async snapshot() {
-      const [nodes, pods, deployments] = await Promise.all([
+      const [nodes, pods, deployments, metrics] = await Promise.all([
         request("/api/v1/nodes"),
         request("/api/v1/pods"),
-        request("/apis/apps/v1/deployments")
+        request("/apis/apps/v1/deployments"),
+        requestMetrics(request)
       ]);
-      return mapClusterSnapshot({ nodes, pods, deployments }, new Date());
+      return mapClusterSnapshot({ nodes, pods, deployments, metrics }, new Date());
     }
   };
+}
+
+async function requestMetrics(request) {
+  try {
+    const [nodes, pods] = await Promise.all([
+      request("/apis/metrics.k8s.io/v1beta1/nodes"),
+      request("/apis/metrics.k8s.io/v1beta1/pods")
+    ]);
+    return { nodes, pods };
+  } catch (error) {
+    return { error: cleanErrorMessage(error) };
+  }
 }
 
 function httpsJson(url, token, ca) {
@@ -251,6 +430,7 @@ function demoRawCluster() {
           spec: {},
           status: {
             capacity: { cpu: "4", memory: "7864320Ki" },
+            allocatable: { cpu: "3800m", memory: "7240Mi" },
             addresses: [{ type: "InternalIP", address: "192.168.4.56" }],
             conditions: [{ type: "Ready", status: "True", reason: "KubeletReady" }],
             nodeInfo: { kubeletVersion: "v1.34.1+k3s1", osImage: "Debian GNU/Linux 12", architecture: "arm64" }
@@ -266,6 +446,7 @@ function demoRawCluster() {
           spec: { unschedulable: false },
           status: {
             capacity: { cpu: "10", memory: "16777216Ki" },
+            allocatable: { cpu: "9400m", memory: "15800Mi" },
             addresses: [{ type: "InternalIP", address: "192.168.4.24" }],
             conditions: [{ type: "Ready", status: "True", reason: "KubeletReady" }],
             nodeInfo: { kubeletVersion: "v1.34.1+k3s1", osImage: "Ubuntu 24.04 LTS", architecture: "arm64" }
@@ -301,6 +482,29 @@ function demoRawCluster() {
         deployment("default", "model-trading-bot-backend", 1, 1),
         externalWorkerDeployment("local-llm", "chris-pc-2-ollama-switch", "chris-pc-2", 1, 1)
       ]
+    },
+    metrics: {
+      nodes: {
+        items: [
+          {
+            metadata: { name: "rpi5-control" },
+            usage: { cpu: "310m", memory: "4720Mi" }
+          },
+          {
+            metadata: { name: "mac-mini-worker" },
+            usage: { cpu: "1250m", memory: "11840Mi" }
+          }
+        ]
+      },
+      pods: {
+        items: [
+          podMetric("default", "pihole-6f9fb77c8d-n2z7x", [["pihole", "45m", "220Mi"]]),
+          podMetric("default", "homebridge-5847b7d9b5-tfm2m", [["homebridge", "32m", "180Mi"]]),
+          podMetric("default", "k8s-management-ui-web-6447596f7c-nx7qk", [["web", "14m", "72Mi"]]),
+          podMetric("default", "local-llm-frontend-75dd47d6b8-bnlq8", [["frontend", "22m", "110Mi"]]),
+          podMetric("default", "model-trading-bot-backend-8b9775d9bc-r5p7d", [["backend", "115m", "740Mi"]])
+        ]
+      }
     }
   };
 }
@@ -367,10 +571,24 @@ function externalWorkerDeployment(namespace, name, worker, replicas, readyReplic
   };
 }
 
+function podMetric(namespace, name, containers) {
+  return {
+    metadata: { namespace, name },
+    containers: containers.map(([containerName, cpu, memory]) => ({
+      name: containerName,
+      usage: { cpu, memory }
+    }))
+  };
+}
+
 module.exports = {
+  buildCapacitySnapshot,
   createKubernetesClient,
   demoRawCluster,
   httpsJson,
   mapClusterSnapshot,
+  memorySeverity,
+  parseCpuToMillicores,
+  parseMemoryToBytes,
   shouldUseDemoMode
 };

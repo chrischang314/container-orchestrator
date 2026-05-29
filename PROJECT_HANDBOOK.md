@@ -24,6 +24,10 @@ allowlisted `kubectl` controls.
   requests require `confirmed: true`, and unsupported commands, blocked
   credentials flags, shell operators, and arbitrary verbs are rejected.
 - Public status mode remains read-only and returns sanitized cluster data.
+- Capacity data is read from the Kubernetes Metrics API, not by shelling out to
+  `kubectl top`. Metrics failures are non-fatal: the normal cluster snapshot
+  still returns, and public status mode receives only node-pressure aggregates
+  without detailed pod names.
 
 ## Rollback Notes
 

@@ -10,6 +10,7 @@ const state = {
 const els = {
   clusterMode: document.querySelector("[data-testid='cluster-mode']"),
   summaryStrip: document.getElementById("summaryStrip"),
+  capacityPanel: document.getElementById("capacityPanel"),
   nodeMap: document.getElementById("nodeMap"),
   lastUpdated: document.getElementById("lastUpdated"),
   selectedNodeLabel: document.getElementById("selectedNodeLabel"),
@@ -52,6 +53,7 @@ async function refreshCluster() {
 function render() {
   if (!state.snapshot) return;
   renderSummary();
+  renderCapacity();
   renderNodes();
   renderContainers();
   renderDeployments();
@@ -76,6 +78,92 @@ function renderSummary() {
     </div>
   `).join("");
   els.lastUpdated.textContent = formatTime(state.snapshot.generatedAt);
+}
+
+function renderCapacity() {
+  const capacity = state.snapshot.capacity || {};
+  if (!capacity.available) {
+    els.capacityPanel.innerHTML = `
+      <div class="section-heading">
+        <h2>Capacity</h2>
+        <span>metrics unavailable</span>
+      </div>
+      <div class="empty-state">${escapeHtml(capacity.reason || "Metrics API data is unavailable.")}</div>
+    `;
+    return;
+  }
+
+  const nodes = capacity.nodes || [];
+  const topPods = capacity.topPods || [];
+  const pressureRows = nodes.map((node) => `
+    <article class="capacity-node">
+      <div class="node-topline">
+        <span class="node-name">${escapeHtml(node.name)}</span>
+        <span class="status-pill ${capacitySeverityClass(node.memory?.severity)}">${escapeHtml(node.memory?.severity || "unknown")}</span>
+      </div>
+      <div class="capacity-bars">
+        ${capacityBar("Memory", node.memory?.percentUsed, formatBytes(node.memory?.usageBytes), node.memory?.basis)}
+        ${capacityBar("CPU", node.cpu?.percentUsed, formatMillicores(node.cpu?.usageMillicores), node.cpu?.basis)}
+      </div>
+    </article>
+  `).join("");
+
+  const podRows = topPods.length
+    ? topPods.map((pod) => `
+      <tr>
+        <td>${escapeHtml(pod.namespace)}</td>
+        <td>${escapeHtml(pod.name)}</td>
+        <td>${escapeHtml(pod.node || "unassigned")}</td>
+        <td>${escapeHtml(formatBytes(pod.memory?.usageBytes))}</td>
+        <td>${escapeHtml(formatMillicores(pod.cpu?.usageMillicores))}</td>
+      </tr>
+    `).join("")
+    : `<tr><td colspan="5" class="empty-state">No pod metrics returned</td></tr>`;
+
+  els.capacityPanel.innerHTML = `
+    <div class="section-heading">
+      <h2>Capacity</h2>
+      <span>${escapeHtml(nodes.length)} nodes measured</span>
+    </div>
+    <div class="capacity-layout">
+      <div class="capacity-node-grid">${pressureRows || `<div class="empty-state">No node metrics returned</div>`}</div>
+      <div class="capacity-pods">
+        <h3>Top Memory Pods</h3>
+        <div class="table-wrap">
+          <table class="capacity-table">
+            <thead>
+              <tr>
+                <th>Namespace</th>
+                <th>Pod</th>
+                <th>Node</th>
+                <th>Memory</th>
+                <th>CPU</th>
+              </tr>
+            </thead>
+            <tbody>${podRows}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function capacityBar(label, percent, usage, basis) {
+  const cleanPercent = Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : 0;
+  const percentLabel = Number.isFinite(percent) ? `${percent}%` : "--";
+  const basisLabel = basis ? `of ${basis}` : "basis unknown";
+  return `
+    <div class="capacity-bar-row">
+      <div class="capacity-bar-label">
+        <span>${escapeHtml(label)}</span>
+        <strong>${escapeHtml(percentLabel)}</strong>
+      </div>
+      <div class="capacity-bar-track" aria-label="${escapeAttr(`${label} ${percentLabel}`)}">
+        <span style="width: ${cleanPercent}%"></span>
+      </div>
+      <div class="capacity-bar-detail">${escapeHtml(usage)} ${escapeHtml(basisLabel)}</div>
+    </div>
+  `;
 }
 
 function renderNodes() {
@@ -421,6 +509,26 @@ function formatTime(value) {
   } catch {
     return "--";
   }
+}
+
+function formatMillicores(value) {
+  if (!Number.isFinite(value)) return "--";
+  if (value >= 1000) return `${Math.round((value / 1000) * 10) / 10} cores`;
+  return `${Math.round(value * 10) / 10}m`;
+}
+
+function formatBytes(value) {
+  if (!Number.isFinite(value)) return "--";
+  const mib = value / (1024 ** 2);
+  if (mib >= 1024) return `${Math.round((mib / 1024) * 10) / 10}Gi`;
+  return `${Math.round(mib)}Mi`;
+}
+
+function capacitySeverityClass(severity) {
+  if (severity === "high") return "blocked";
+  if (severity === "elevated") return "pending";
+  if (severity === "normal") return "ready";
+  return "paused";
 }
 
 function escapeHtml(value) {
