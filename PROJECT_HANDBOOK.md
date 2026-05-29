@@ -48,7 +48,8 @@ they are the direct cause of the outage.
   diagnosis banner as an active DNS outage.
 - Local Agent starts with backend and frontend only. Leave the worker scaled to
   zero until a `ghcr.io/chrischang314/local-agent/worker:main` image exists and
-  execution features are deliberately enabled.
-- Local Agent's backend is a singleton on `mac-mini-worker` and uses
-  `strategy.type: Recreate`; a default surge rollout can leave upgrades stuck
-  because the node may not fit a second 2 GiB backend pod.
+  execution features are deliberately enabled. Its backend uses dependency-aware
+  readiness and TCP liveness; do not point liveness at `/api/health/ready`
+  unless there is a proven restart-safe failure mode. Keep the backend strategy
+  on `Recreate` because a rolling update tries to schedule a second 512Mi
+  backend on the Mac Mini and can fail with `Insufficient memory`.

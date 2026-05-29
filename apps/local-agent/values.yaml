@@ -22,6 +22,8 @@ services:
       enabled: false
     port: 8000
     replicas: 1
+    strategy:
+      type: Recreate
     nodeSelector:
       kubernetes.io/hostname: mac-mini-worker
     # The Mac Mini worker cannot reliably schedule a second 2Gi backend pod
@@ -88,12 +90,15 @@ services:
           port: 8000
         initialDelaySeconds: 5
         periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 6
       liveness:
-        httpGet:
-          path: /api/health/ready
+        tcpSocket:
           port: 8000
-        initialDelaySeconds: 20
-        periodSeconds: 20
+        initialDelaySeconds: 60
+        periodSeconds: 30
+        timeoutSeconds: 5
+        failureThreshold: 6
 
   - name: frontend
     serviceAccountName: local-agent-frontend

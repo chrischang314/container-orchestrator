@@ -101,6 +101,14 @@ It uses readiness and startup probes, but no liveness probe, because killing a
 stateful Postgres pod during NFS recovery or a restore can extend an outage.
 The pod has a 1 GiB memory limit for pgvector-backed recruiting queries.
 
+Local Agent runs on Synology-backed PVCs for its app data and shared auth. Its
+backend readiness probe stays dependency-aware at `/api/health/ready`, but its
+liveness probe is intentionally a TCP socket check with a longer failure window
+so short NFS or application stalls do not restart an otherwise recoverable
+control-plane backend. The backend uses a `Recreate` rollout because the Mac
+Mini worker does not have enough spare requested memory to run a second backend
+pod during a rolling update.
+
 ## Day-1 setup, end to end
 
 1. **Enable Kubernetes in Docker Desktop** —
