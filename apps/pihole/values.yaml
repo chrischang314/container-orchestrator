@@ -58,6 +58,13 @@ services:
             key: webpassword
       - name: FTLCONF_dns_listeningMode
         value: all
+      # K3s ServiceLB/NAT can collapse many LAN and cluster DNS clients behind
+      # one pod-facing address, so keep Pi-hole's per-client limiter above
+      # normal aggregate homelab bursts while still bounded.
+      - name: FTLCONF_dns_rateLimit_count
+        value: "10000"
+      - name: FTLCONF_dns_rateLimit_interval
+        value: "60"
 
     # NET_ADMIN is required for FTL and optional DHCP support.
     securityContext:

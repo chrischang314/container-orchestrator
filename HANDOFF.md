@@ -63,6 +63,11 @@ Pi-hole DNS is exposed separately as a `LoadBalancer` service on TCP/UDP `53`.
 The Pi-hole web UI is a separate ClusterIP service named `pihole-web` and is
 routed through ingress at `pihole.lan`.
 
+Pi-hole's per-client rate limiter is raised to `10000` queries per `60` seconds
+in `apps/pihole/values.yaml`. Keep that override unless client IP preservation
+changes, because K3s ServiceLB/NAT can make many LAN and cluster DNS clients
+appear to FTL as one source such as `10.42.0.1`.
+
 DNS cannot remove or rewrite port numbers by itself. The no-port URLs work
 because ingress-nginx owns port `80`, and Pi-hole only resolves hostnames.
 

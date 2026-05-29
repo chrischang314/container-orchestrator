@@ -41,6 +41,11 @@ they are the direct cause of the outage.
   the image is already cached. Use readiness and startup probes only; a
   liveness probe can kill Postgres during NFS recovery, restores, or temporary
   pgvector-heavy read pressure and make the outage longer.
+- Pi-hole runs behind K3s ServiceLB, where many DNS clients can be seen by FTL
+  as the same pod-facing source address. Keep the `dns.rateLimit` override high
+  enough for aggregate LAN bursts, and verify with both `pihole status` and
+  `Resolve-DnsName <host> -Server 192.168.4.56` before treating the web UI's
+  diagnosis banner as an active DNS outage.
 - Local Agent starts with backend and frontend only. Leave the worker scaled to
   zero until a `ghcr.io/chrischang314/local-agent/worker:main` image exists and
   execution features are deliberately enabled.

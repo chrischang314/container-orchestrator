@@ -196,6 +196,9 @@ After verification, point the router's DNS/DHCP settings at `192.168.4.56`.
   address, so app URLs do not need port numbers.
 - Keep `localagent.lan` and `homeassistant.lan` in `dns.hosts` whenever those
   apps are enabled on the launchpad.
+- Pi-hole keeps rate limiting enabled, but `apps/pihole/values.yaml` raises the
+  per-client limit to `10000` queries per `60` seconds because K3s
+  ServiceLB/NAT can collapse many clients behind one pod-facing address.
 - DHCP (port 67) is not exposed in K8s by default. If you use Pi-hole for DHCP,
   add `- name: dhcp / port: 67 / protocol: UDP` to `extraPorts`.
 
