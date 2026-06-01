@@ -89,7 +89,7 @@ services:
   # ── Scraper daemon ─────────────────────────────────────────────────────────
   - name: scraper
     image: ghcr.io/chrischang314/recruiting-app/scraper
-    tag: public-sources-20260521-0039
+    tag: main
     # No port — daemon only, no HTTP surface.
     replicas: 1
     strategy:
@@ -149,6 +149,10 @@ services:
         value: "true"
       - name: SCRAPER_CRAWL_INTERVAL_HOURS
         value: "1.0"
+      - name: SCRAPER_QUESTION_INTERVAL_MINUTES
+        # Keep question extraction on a non-aligned cadence from the 2-minute
+        # embed job so the shared scraper lock does not periodically collide.
+        value: "10.37"
       - name: SCRAPER_REDDIT_LIMIT_PER_QUERY
         value: "50"
       - name: SCRAPER_HACKERNEWS_LIMIT_PER_QUERY
