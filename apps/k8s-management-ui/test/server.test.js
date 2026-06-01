@@ -225,6 +225,44 @@ test("public status mode serves sanitized cluster data and blocks controls", asy
   }
 });
 
+test("public status mode treats scaled-to-zero deployments as inactive", async () => {
+  const raw = demoRawCluster();
+  raw.deployments.items.push({
+    metadata: { namespace: "local-agent-model-workers", name: "chris-pc-1-model-switch" },
+    spec: { replicas: 0 },
+    status: { readyReplicas: 0, updatedReplicas: 0, availableReplicas: 0 }
+  });
+
+  const server = createServer({
+    env: {
+      K8S_UI_DEMO: "true",
+      K8S_UI_PUBLIC_STATUS: "true"
+    },
+    client: {
+      mode: "test",
+      async snapshot() {
+        return mapClusterSnapshot(raw, new Date("2026-05-17T12:00:00Z"));
+      }
+    }
+  });
+
+  await listen(server);
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const cluster = await getJson(`${base}/api/cluster`);
+
+    assert.equal(cluster.summary.deployments, 7);
+    assert.equal(cluster.summary.readyDeployments, 7);
+    assert.equal(cluster.health.workloads, "healthy");
+    const inactiveNamespace = cluster.namespaces.find((item) => item.namespace === "local-agent-model-workers");
+    assert.equal(inactiveNamespace.readyDeployments, 1);
+    assert.equal(inactiveNamespace.readyReplicas, 0);
+    assert.equal(inactiveNamespace.replicas, 0);
+  } finally {
+    await close(server);
+  }
+});
+
 function listen(server) {
   return new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 }

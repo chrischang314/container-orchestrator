@@ -33,4 +33,6 @@ Set `K8S_UI_PUBLIC_STATUS=true` for the status-only public deployment. In this
 mode the root page serves a read-only dashboard, `GET /api/cluster` returns a
 sanitized aggregate snapshot, and command/action endpoints return `403`.
 Capacity summaries remain available in public status mode, but detailed top-pod
-names are omitted.
+names are omitted. Deployments intentionally scaled to `0` replicas are treated
+as inactive rather than unhealthy so dormant worker switches do not create false
+public attention.

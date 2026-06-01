@@ -218,7 +218,7 @@ function ensureNamespace(namespaces, namespace) {
 
 function isDeploymentReady(deployment) {
   const replicas = Number(deployment.replicas || 0);
-  return replicas > 0 && Number(deployment.readyReplicas || 0) === replicas;
+  return replicas === 0 || Number(deployment.readyReplicas || 0) === replicas;
 }
 
 function setSecurityHeaders(res) {

@@ -23,6 +23,9 @@ allowlisted `kubectl` controls.
   rest of the cluster snapshot with `capacity.available=false`.
 - The public `k8s-cluster-status` deployment may show node-level capacity
   summaries, but it must not expose detailed top-pod names.
+- Public status treats deployments scaled to `0` replicas as inactive instead
+  of unhealthy, which avoids false attention for dormant worker switches and
+  sandbox placeholders.
 - Read-only commands and status actions run directly.
 - Mutating built-in actions and typed mutating commands open a confirmation
   dialog before any network request is sent.
