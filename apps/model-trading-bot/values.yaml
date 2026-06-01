@@ -45,11 +45,10 @@ services:
           port: 8000
         initialDelaySeconds: 10
         periodSeconds: 15
-        timeoutSeconds: 5
+        timeoutSeconds: 10
         failureThreshold: 6
       liveness:
-        httpGet:
-          path: /health
+        tcpSocket:
           port: 8000
         initialDelaySeconds: 60
         periodSeconds: 30

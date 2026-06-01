@@ -111,9 +111,9 @@ not have enough spare requested memory to run a second backend pod during a
 rolling update.
 
 Model Trading Bot also has a PVC-backed backend on the Mac Mini worker. Keep it
-on a `Recreate` rollout and use tolerant `/health` probes so brief NFS or data
-provider stalls do not cause liveness restarts while the frontend remains
-available through `modeltradingbot.lan`.
+on a `Recreate` rollout, dependency-aware `/health` readiness, and TCP liveness
+so brief NFS or data-provider stalls do not cause liveness restarts while the
+frontend remains available through `modeltradingbot.lan`.
 
 ## Day-1 setup, end to end
 

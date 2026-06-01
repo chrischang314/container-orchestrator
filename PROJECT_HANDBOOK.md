@@ -64,6 +64,6 @@ they are the direct cause of the outage.
   `strategy.type: Recreate`; a default surge rollout can leave upgrades stuck
   because the node may not fit a second backend pod.
 - Model Trading Bot's backend is also a PVC-backed singleton on
-  `mac-mini-worker`. Keep `strategy.type: Recreate` and tolerant `/health`
-  probes so transient Synology NFS or provider stalls do not cause liveness
-  restart loops.
+  `mac-mini-worker`. Keep `strategy.type: Recreate`, `/health` readiness, and
+  TCP liveness so transient Synology NFS or provider stalls do not cause
+  liveness restart loops.
