@@ -1,4 +1,4 @@
-# 1point3acres corpus — scraper + API + frontend.
+# Recruiting assistant pipeline - scraper + API + frontend.
 #
 # PRE-DEPLOY CHECKLIST:
 #   1. recruiting-db-secret must exist (created by postgres app bootstrap).
@@ -120,11 +120,11 @@ services:
       - name: SCRAPER_IMAGE_DIR
         value: /app/data/images
       - name: SCRAPER_MIN_REQUEST_INTERVAL_SECS
-        value: "1.0"
+        value: "0.5"
       - name: SCRAPER_MAX_REQUEST_INTERVAL_SECS
-        value: "2.0"
+        value: "1.25"
       - name: SCRAPER_MAX_CONCURRENT_REQUESTS
-        value: "6"
+        value: "10"
       - name: SCRAPER_REFRESH_EXISTING_POSTS
         value: "false"
       - name: SCRAPER_MAX_PAGES_PER_CATEGORY
@@ -138,7 +138,7 @@ services:
       - name: SCRAPER_MAX_THREAD_PAGES_PER_POST
         value: "0"
       - name: SCRAPER_ENABLE_CRAWL
-        value: "false"
+        value: "true"
       - name: SCRAPER_ENABLE_EMBED
         value: "true"
       - name: SCRAPER_ENABLE_OCR
@@ -148,31 +148,53 @@ services:
       - name: SCRAPER_ENABLE_QUESTION
         value: "true"
       - name: SCRAPER_CRAWL_INTERVAL_HOURS
-        value: "1.0"
+        value: "0.5"
       - name: SCRAPER_QUESTION_INTERVAL_MINUTES
-        # Keep question extraction on a non-aligned cadence from the 2-minute
+        # Keep question extraction on a non-aligned cadence from the 1.5-minute
         # embed job so the shared scraper lock does not periodically collide.
-        value: "10.37"
+        value: "7.37"
+      - name: SCRAPER_QUESTION_BATCH_SIZE
+        value: "100"
+      - name: SCRAPER_EMBED_INTERVAL_MINUTES
+        value: "1.5"
       - name: SCRAPER_REDDIT_LIMIT_PER_QUERY
-        value: "50"
+        value: "100"
+      - name: SCRAPER_REDDIT_TIME_FILTER
+        value: all
+      - name: SCRAPER_REDDIT_SUBREDDITS
+        value: cscareerquestions,ExperiencedDevs,leetcode,csMajors,ITCareerQuestions,EngineeringResumes,AskProgramming,learnprogramming,webdev,developersIndia
+      - name: SCRAPER_REDDIT_QUERIES
+        value: interview,onsite,online assessment,OA,system design,behavioral interview,coding interview,phone screen,take home,new grad interview,intern interview,offer negotiation,Google interview,Amazon interview,Meta interview,Microsoft interview,Apple interview,Netflix interview,OpenAI interview,Anthropic interview,Databricks interview,Stripe interview,Airbnb interview,Uber interview,TikTok interview,Bloomberg interview,Goldman Sachs interview,Jane Street interview,Two Sigma interview,Citadel interview,Roblox interview,Palantir interview
+      - name: SCRAPER_HACKERNEWS_QUERIES
+        value: interview,software engineer interview,coding interview,system design interview,online assessment,phone screen,take home,Google interview,Amazon interview,Meta interview,Microsoft interview,Apple interview,Netflix interview,OpenAI interview,Anthropic interview,Databricks interview,Stripe interview,Airbnb interview,Uber interview,TikTok interview,Bloomberg interview,Goldman Sachs interview,Jane Street interview,Two Sigma interview,Citadel interview,Roblox interview,Palantir interview,LeetCode
       - name: SCRAPER_HACKERNEWS_LIMIT_PER_QUERY
         value: "100"
+      - name: SCRAPER_HACKERNEWS_PAGES_PER_QUERY
+        value: "2"
       - name: SCRAPER_STACKEXCHANGE_LIMIT_PER_QUERY
-        value: "10"
+        value: "50"
+      - name: SCRAPER_STACKEXCHANGE_PAGES_PER_QUERY
+        value: "2"
       - name: SCRAPER_STACKEXCHANGE_SITES
-        value: workplace
+        value: workplace,stackoverflow,softwareengineering,cseducators
       - name: SCRAPER_STACKEXCHANGE_QUERIES
-        value: interview,offer negotiation
+        value: technical interview,behavioral interview,system design interview,software engineer interview,coding interview,phone screen,take home assignment,online assessment,new grad interview,internship interview,resume screen,offer negotiation,leetcode
+      - name: SCRAPER_DEVTO_TAGS
+        value: interview,career,jobhunt,jobsearch,systemdesign,leetcode,programming,webdev,javascript,python,java,devops,softwareengineering,computerscience
       - name: SCRAPER_DEVTO_LIMIT_PER_TAG
-        value: "30"
+        value: "80"
+      - name: SCRAPER_DEVTO_PAGES_PER_TAG
+        value: "2"
       - name: SCRAPER_GEEKSFORGEEKS_MAX_PAGES
-        value: "3"
+        value: "12"
       - name: SCRAPER_CODE360_PAGES
-        value: "3"
+        value: "10"
       - name: SCRAPER_CODE360_LIMIT_PER_PAGE
-        value: "50"
+        value: "100"
+      - name: SCRAPER_NOWCODER_DISCOVER_URLS
+        value: https://www.nowcoder.com/discuss?type=2&order=3&query=%E9%9D%A2%E7%BB%8F,https://www.nowcoder.com/discuss?type=2&order=3&query=%E9%9D%A2%E8%AF%95,https://www.nowcoder.com/discuss?type=2&order=3&query=%E6%A0%A1%E6%8B%9B,https://www.nowcoder.com/discuss?type=2&order=3&query=%E5%AE%9E%E4%B9%A0,https://www.nowcoder.com/discuss?type=0&order=3,https://www.nowcoder.com/?target=main
       - name: SCRAPER_NOWCODER_LIMIT
-        value: "50"
+        value: "200"
 
     resources:
       requests:
@@ -218,7 +240,28 @@ services:
     annotations:
       local-llm.io/control-help: "Scale replicas to 1 to enable CHRIS-PC-2 recruiting scraper, or 0 to stop it."
       local-llm.io/controlled-by: "scripts/local-scraper-worker-controller.ps1 running on CHRIS-PC-2"
-      recruiting-app.io/sources: "devto,hackernews,reddit"
+      recruiting-app.io/image: "ghcr.io/chrischang314/recruiting-app/scraper:pc-crawler-amd64"
+      recruiting-app.io/sources: "geeksforgeeks,code360,stackexchange,devto,nowcoder,hackernews,reddit"
+      recruiting-app.io/crawl-interval-hours: "0.5"
+      recruiting-app.io/min-request-interval-secs: "0.5"
+      recruiting-app.io/max-request-interval-secs: "1.25"
+      recruiting-app.io/max-concurrent-requests: "10"
+      recruiting-app.io/reddit-limit-per-query: "100"
+      recruiting-app.io/reddit-time-filter: "all"
+      recruiting-app.io/hackernews-limit-per-query: "100"
+      recruiting-app.io/hackernews-pages-per-query: "2"
+      recruiting-app.io/stackexchange-sites: "workplace,stackoverflow,softwareengineering,cseducators"
+      recruiting-app.io/stackexchange-queries: "technical interview,behavioral interview,system design interview,software engineer interview,coding interview,phone screen,take home assignment,online assessment,new grad interview,internship interview,resume screen,offer negotiation,leetcode"
+      recruiting-app.io/stackexchange-limit-per-query: "50"
+      recruiting-app.io/stackexchange-pages-per-query: "2"
+      recruiting-app.io/devto-tags: "interview,career,jobhunt,jobsearch,systemdesign,leetcode,programming,webdev,javascript,python,java,devops,softwareengineering,computerscience"
+      recruiting-app.io/devto-limit-per-tag: "80"
+      recruiting-app.io/devto-pages-per-tag: "2"
+      recruiting-app.io/geeksforgeeks-max-pages: "12"
+      recruiting-app.io/code360-pages: "10"
+      recruiting-app.io/code360-limit-per-page: "100"
+      recruiting-app.io/nowcoder-discover-urls: "https://www.nowcoder.com/discuss?type=2&order=3&query=%E9%9D%A2%E7%BB%8F,https://www.nowcoder.com/discuss?type=2&order=3&query=%E9%9D%A2%E8%AF%95,https://www.nowcoder.com/discuss?type=2&order=3&query=%E6%A0%A1%E6%8B%9B,https://www.nowcoder.com/discuss?type=2&order=3&query=%E5%AE%9E%E4%B9%A0,https://www.nowcoder.com/discuss?type=0&order=3,https://www.nowcoder.com/?target=main"
+      recruiting-app.io/nowcoder-limit: "200"
     resources:
       requests:
         cpu: 1m
@@ -244,7 +287,28 @@ services:
     annotations:
       local-llm.io/control-help: "Scale replicas to 1 to enable CHRIS-PC-1 recruiting scraper, or 0 to stop it."
       local-llm.io/controlled-by: "scripts/local-scraper-worker-controller.ps1 running on CHRIS-PC-1"
-      recruiting-app.io/sources: "geeksforgeeks,code360,stackexchange,nowcoder"
+      recruiting-app.io/image: "ghcr.io/chrischang314/recruiting-app/scraper:pc-crawler-amd64"
+      recruiting-app.io/sources: "geeksforgeeks,code360,stackexchange,devto,nowcoder,hackernews,reddit"
+      recruiting-app.io/crawl-interval-hours: "0.5"
+      recruiting-app.io/min-request-interval-secs: "0.5"
+      recruiting-app.io/max-request-interval-secs: "1.25"
+      recruiting-app.io/max-concurrent-requests: "10"
+      recruiting-app.io/reddit-limit-per-query: "100"
+      recruiting-app.io/reddit-time-filter: "all"
+      recruiting-app.io/hackernews-limit-per-query: "100"
+      recruiting-app.io/hackernews-pages-per-query: "2"
+      recruiting-app.io/stackexchange-sites: "workplace,stackoverflow,softwareengineering,cseducators"
+      recruiting-app.io/stackexchange-queries: "technical interview,behavioral interview,system design interview,software engineer interview,coding interview,phone screen,take home assignment,online assessment,new grad interview,internship interview,resume screen,offer negotiation,leetcode"
+      recruiting-app.io/stackexchange-limit-per-query: "50"
+      recruiting-app.io/stackexchange-pages-per-query: "2"
+      recruiting-app.io/devto-tags: "interview,career,jobhunt,jobsearch,systemdesign,leetcode,programming,webdev,javascript,python,java,devops,softwareengineering,computerscience"
+      recruiting-app.io/devto-limit-per-tag: "80"
+      recruiting-app.io/devto-pages-per-tag: "2"
+      recruiting-app.io/geeksforgeeks-max-pages: "12"
+      recruiting-app.io/code360-pages: "10"
+      recruiting-app.io/code360-limit-per-page: "100"
+      recruiting-app.io/nowcoder-discover-urls: "https://www.nowcoder.com/discuss?type=2&order=3&query=%E9%9D%A2%E7%BB%8F,https://www.nowcoder.com/discuss?type=2&order=3&query=%E9%9D%A2%E8%AF%95,https://www.nowcoder.com/discuss?type=2&order=3&query=%E6%A0%A1%E6%8B%9B,https://www.nowcoder.com/discuss?type=2&order=3&query=%E5%AE%9E%E4%B9%A0,https://www.nowcoder.com/discuss?type=0&order=3,https://www.nowcoder.com/?target=main"
+      recruiting-app.io/nowcoder-limit: "200"
     resources:
       requests:
         cpu: 1m

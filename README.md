@@ -90,10 +90,12 @@ the session returns `user_banned`
 or "用户组: 不准访问", keep scraper replicas at 0 until a permitted
 `storage_state.json` is copied into the scraper PVC.
 
-While 1point3acres is blocked, the deployed scraper runs Hacker News + Reddit
-only with a faster public-source profile: 6 configured in-flight requests,
-1-2 seconds between request starts, 100 Hacker News results per query, 50
-Reddit results per query, and a 1-hour crawl interval. Keep replicas at 1
+While 1point3acres is blocked, the deployed scraper runs the full public-source
+profile: GeeksforGeeks, Code360, Stack Exchange, DEV, Nowcoder, Hacker News,
+and Reddit. The in-cluster scraper and both optional PC workers use a
+30-minute crawl interval, 10 configured in-flight requests, 0.5-1.25 seconds
+between request starts, deeper per-source page limits, and expanded
+company-specific interview queries. Keep the in-cluster scraper at 1 replica
 because each pod runs the full scheduler.
 
 Recruiting PostgreSQL runs on the `postgres-postgres-pgdata` Synology NFS PVC.
