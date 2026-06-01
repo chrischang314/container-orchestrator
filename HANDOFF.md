@@ -91,10 +91,10 @@ kubectl exec deploy/pihole-pihole -- pihole-FTL --config dns.hosts
 | `homebridge` | `homebridge/homebridge:latest` | `homebridge.lan` | `rpi5-control` | Uses `hostNetwork: true` for HomeKit/mDNS reliability. Config path is `/srv/homebridge` on the Pi. |
 | `k8s-management-ui` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | `k8s.lan` | `rpi5-control` | LAN control panel for nodes, containers, deployments, read-only Metrics API capacity pressure, and allowlisted kubectl controls. Mutating controls require UI confirmation and backend `confirmed: true` before execution; cluster-scoped RBAC remains the enforcement layer. |
 | `k8s-cluster-status` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | internal only | `rpi5-control` | Read-only public-status service for the portfolio `/cluster-status/` proxy. Uses read-only RBAC and sanitized aggregate output; capacity summaries omit detailed pod names. Deployments scaled to `0` are inactive, not unhealthy. |
-| `local-agent` | `ghcr.io/chrischang314/local-agent/backend:main`, `frontend:main` | `localagent.lan` | `mac-mini-worker` | Backend and frontend are deployed with execution disabled. Worker replicas stay at 0 until a `worker:main` image exists and execution is intentionally enabled. Backend readiness checks `/api/health/ready`; liveness is a tolerant TCP check to avoid restarts during short Synology NFS or app stalls. The backend uses `strategy.type: Recreate` because the Mac Mini worker cannot reliably fit a second backend pod during a rolling-update surge. |
+| `local-agent` | `ghcr.io/chrischang314/local-agent/backend:main`, `frontend:main` | `localagent.lan` | `mac-mini-worker` | Backend and frontend are deployed with execution disabled. Worker replicas stay at 0 until a `worker:main` image exists and execution is intentionally enabled. Backend readiness checks `/api/health/ready` with an extended timeout for dependency checks that touch Synology NFS; liveness is a tolerant TCP check to avoid restarts during short NFS or app stalls. The backend uses `strategy.type: Recreate` because the Mac Mini worker cannot reliably fit a second backend pod during a rolling-update surge. |
 | `local-llm` | `ghcr.io/chrischang314/local-llm/*:main` | `localllm.lan` | `mac-mini-worker` | Backend reaches Ollama on the Mac host through `host.lima.internal:11434`, aliasing to `192.168.5.2`. |
 | `model-railroad-automation` | `ghcr.io/chrischang314/model-railroad-automation/web-control:main` | `modelrailroadautomation.lan` | `railroad-pi3` | Train web server; talks to DCC-EX at `192.168.4.22:2560`. |
-| `model-trading-bot` | `ghcr.io/chrischang314/model-trading-bot/*:main` | `modeltradingbot.lan` | `mac-mini-worker` | Frontend plus backend with local data PVC. |
+| `model-trading-bot` | `ghcr.io/chrischang314/model-trading-bot/*:main` | `modeltradingbot.lan` | `mac-mini-worker` | Frontend plus backend with local data PVC on Synology NFS. The backend is a singleton with `strategy.type: Recreate` and tolerant `/health` probes so brief NFS or data-provider stalls do not trigger liveness restarts. |
 | `pihole` | `pihole/pihole:latest` | `pihole.lan` | `rpi5-control` | DNS on port 53, web via ingress. Config paths are `/srv/pihole/etc-pihole` and `/srv/pihole/etc-dnsmasq.d`. |
 | `postgres` | `pgvector/pgvector:pg16` | internal only | `mac-mini-worker` | Shared PostgreSQL/pgvector database for recruiting app. Uses the `postgres-postgres-pgdata` PVC on the default `synology-nfs` StorageClass, `imagePullPolicy: IfNotPresent`, a 1 GiB memory limit, and readiness/startup probes only. Do not add a liveness probe unless there is a proven restart-safe failure mode. |
 | `recruiting-app` | `ghcr.io/chrischang314/recruiting-app/*:main` | `recruitingapp.lan` | `mac-mini-worker` | API, LAN frontend, public `/recruiting-app` frontend, scraper. The public frontend is a separate `frontend-public` service using `ghcr.io/chrischang314/recruiting-app/frontend-public:main`, built with `NEXT_PUBLIC_BASE_PATH=/recruiting-app` for the `chriswchang.com/recruiting-app` proxy. 1point3acres requires a copied `data/storage_state.json`, but it is disabled while the current session returns `user_banned` / "用户组: 不准访问". Active scraper sources are Hacker News + Reddit with embeddings enabled; OCR is paused on the Mac Mini to avoid memory pressure with BGE-M3. |
@@ -139,9 +139,10 @@ recruiting app's optional PC scraper switches use this to avoid immutable
 Deployment selector drift during Helm upgrades.
 
 Singleton services pinned to memory-constrained nodes can override the chart's
-default rolling-update surge. `local-agent` does this for the backend with
-`strategy.type: Recreate`; otherwise Helm upgrades can fail with a pending new
-backend pod while the old pod continues serving traffic.
+default rolling-update surge. `local-agent` and `model-trading-bot` do this for
+their backends with `strategy.type: Recreate`; otherwise Helm upgrades can fail
+with a pending new backend pod while the old pod continues serving traffic, or
+two pods can briefly contend for the same PVC-backed data.
 
 ## Storage
 

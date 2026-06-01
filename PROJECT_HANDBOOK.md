@@ -58,8 +58,12 @@ they are the direct cause of the outage.
 - Local Agent starts with backend and frontend only. Leave the worker scaled to
   zero until a `ghcr.io/chrischang314/local-agent/worker:main` image exists and
   execution features are deliberately enabled. Its backend uses dependency-aware
-  readiness and TCP liveness; do not point liveness at `/api/health/ready`
-  unless there is a proven restart-safe failure mode.
+  readiness with an extended timeout and TCP liveness; do not point liveness at
+  `/api/health/ready` unless there is a proven restart-safe failure mode.
 - Local Agent's backend is a singleton on `mac-mini-worker` and uses
   `strategy.type: Recreate`; a default surge rollout can leave upgrades stuck
   because the node may not fit a second backend pod.
+- Model Trading Bot's backend is also a PVC-backed singleton on
+  `mac-mini-worker`. Keep `strategy.type: Recreate` and tolerant `/health`
+  probes so transient Synology NFS or provider stalls do not cause liveness
+  restart loops.

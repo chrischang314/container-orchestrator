@@ -102,12 +102,18 @@ stateful Postgres pod during NFS recovery or a restore can extend an outage.
 The pod has a 1 GiB memory limit for pgvector-backed recruiting queries.
 
 Local Agent runs on Synology-backed PVCs for its app data and shared auth. Its
-backend readiness probe stays dependency-aware at `/api/health/ready`, but its
-liveness probe is intentionally a TCP socket check with a longer failure window
-so short NFS or application stalls do not restart an otherwise recoverable
-control-plane backend. The backend uses a `Recreate` rollout because the Mac
-Mini worker does not have enough spare requested memory to run a second backend
-pod during a rolling update.
+backend readiness probe stays dependency-aware at `/api/health/ready`, with a
+longer timeout because those checks can touch NFS-backed paths. Its liveness
+probe is intentionally a TCP socket check with a longer failure window so short
+NFS or application stalls do not restart an otherwise recoverable control-plane
+backend. The backend uses a `Recreate` rollout because the Mac Mini worker does
+not have enough spare requested memory to run a second backend pod during a
+rolling update.
+
+Model Trading Bot also has a PVC-backed backend on the Mac Mini worker. Keep it
+on a `Recreate` rollout and use tolerant `/health` probes so brief NFS or data
+provider stalls do not cause liveness restarts while the frontend remains
+available through `modeltradingbot.lan`.
 
 ## Day-1 setup, end to end
 
@@ -270,10 +276,11 @@ Synology, but it should not be on the critical startup path for
    changes, Keel triggers a rolling update of the matching Deployment.
 3. Stateful pods retain their PVCs across the rollout.
 
-Local Agent is an exception to the default rolling-update strategy: its backend
-is a singleton pinned to `mac-mini-worker` with a 2 GiB memory limit, so
-`apps/local-agent/values.yaml` uses `strategy.type: Recreate` to prevent a
-second backend pod from being scheduled during a surge.
+Local Agent and Model Trading Bot are exceptions to the default rolling-update
+strategy: their backends are singleton PVC-backed services pinned to
+`mac-mini-worker`, so their app values use `strategy.type: Recreate` to prevent
+a second backend pod from being scheduled during a surge or mounting the same
+data claim.
 
 The in-repo `k8s-management-ui` workflow builds and pushes
 `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` from this

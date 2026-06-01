@@ -11,6 +11,10 @@ services:
     tag: main
     port: 8000
     replicas: 1
+    # The backend is a PVC-backed singleton on the Mac Mini worker. Replace it
+    # in place so upgrades do not mount the same data/auth claims from a surge pod.
+    strategy:
+      type: Recreate
     nodeSelector:
       kubernetes.io/hostname: mac-mini-worker
     env:
@@ -40,13 +44,17 @@ services:
           path: /health
           port: 8000
         initialDelaySeconds: 10
-        periodSeconds: 10
+        periodSeconds: 15
+        timeoutSeconds: 5
+        failureThreshold: 6
       liveness:
         httpGet:
           path: /health
           port: 8000
-        initialDelaySeconds: 30
-        periodSeconds: 20
+        initialDelaySeconds: 60
+        periodSeconds: 30
+        timeoutSeconds: 5
+        failureThreshold: 6
     persistence:
       - name: data
         claimName: model-trading-bot-backend-data-nfs
