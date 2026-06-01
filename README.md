@@ -294,6 +294,10 @@ pods when `metrics.k8s.io` is available, and keeps the rest of the cluster
 snapshot online with a clear unavailable state if Metrics API access fails. The
 public status deployment keeps detailed pod names out of its sanitized payload
 and treats `replicas: 0` deployments as inactive rather than unhealthy.
+It also includes read-only storage readiness data for PVCs, PVs, and
+StorageClasses when those Kubernetes API reads are allowed. The LAN dashboard
+shows PVC risk details, while the public status deployment exposes only
+aggregate storage counts.
 
 For faster public deploys, the polling can be replaced by a webhook from
 Actions.

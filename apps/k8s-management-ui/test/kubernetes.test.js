@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const {
   demoRawCluster,
   mapClusterSnapshot,
+  mapStorageReadiness,
   parseCpuMillis,
   parseMemoryBytes,
   shouldUseDemoMode
@@ -29,6 +30,8 @@ test("mapClusterSnapshot groups pods and containers by node", () => {
   assert.equal(snapshot.capacity.available, true);
   assert.equal(snapshot.capacity.nodes.length, 2);
   assert.equal(snapshot.capacity.topPods[0].name, "model-trading-bot-backend-8b9775d9bc-r5p7d");
+  assert.equal(snapshot.storage.available, true);
+  assert.equal(snapshot.storage.summary.pvcCount, 3);
 
   const worker = snapshot.nodes.find((node) => node.name === "mac-mini-worker");
   assert.equal(worker.role, "worker");
@@ -40,6 +43,68 @@ test("mapClusterSnapshot groups pods and containers by node", () => {
   assert.equal(externalWorker.online, true);
   assert.equal(externalWorker.deployment, "chris-pc-2-ollama-switch");
   assert.equal(externalWorker.desiredState, "on");
+});
+
+test("mapStorageReadiness classifies PVC storage risk and workload consumers", () => {
+  const raw = demoRawCluster();
+  const storage = mapStorageReadiness(raw, raw.pods.items, raw.deployments.items);
+
+  assert.equal(storage.available, true);
+  assert.equal(storage.partial, false);
+  assert.equal(storage.summary.pvcCount, 3);
+  assert.equal(storage.summary.localPath, 2);
+  assert.equal(storage.summary.network, 1);
+  assert.equal(storage.summary.highRisk, 2);
+  assert.equal(storage.summary.attention, 2);
+
+  const localClaim = storage.claims.find((claim) => claim.name === "model-trading-bot-backend-data");
+  assert.equal(localClaim.risk, "high");
+  assert.equal(localClaim.storageType, "local");
+  assert.deepEqual(localClaim.ownerWorkloads, ["Deployment/model-trading-bot-backend"]);
+  assert.match(localClaim.riskReasons.join(" "), /node-local/);
+
+  const nfsClaim = storage.claims.find((claim) => claim.name === "postgres-postgres-pgdata");
+  assert.equal(nfsClaim.risk, "normal");
+  assert.equal(nfsClaim.storageType, "network");
+
+  const pendingClaim = storage.claims.find((claim) => claim.status === "Pending");
+  assert.equal(pendingClaim.risk, "high");
+  assert.match(pendingClaim.riskReasons.join(" "), /not bound/);
+});
+
+test("mapStorageReadiness keeps PVC inventory when PV and StorageClass reads are partial", () => {
+  const raw = demoRawCluster();
+  const storage = mapStorageReadiness({
+    storageApi: {
+      claims: raw.persistentVolumeClaims,
+      volumes: null,
+      classes: null,
+      errors: [
+        "/api/v1/persistentvolumes: forbidden",
+        "/apis/storage.k8s.io/v1/storageclasses: forbidden"
+      ]
+    }
+  }, raw.pods.items, raw.deployments.items);
+
+  assert.equal(storage.available, true);
+  assert.equal(storage.partial, true);
+  assert.equal(storage.claims.length, 3);
+  assert.equal(storage.errors.length, 2);
+  assert.equal(storage.claims.every((claim) => claim.riskReasons.some((reason) => /unavailable/.test(reason))), true);
+});
+
+test("mapStorageReadiness reports unavailable storage when PVC reads fail", () => {
+  const storage = mapStorageReadiness({
+    storageApi: {
+      claims: null,
+      claimsUnavailable: true,
+      errors: ["/api/v1/persistentvolumeclaims: forbidden"]
+    }
+  });
+
+  assert.equal(storage.available, false);
+  assert.equal(storage.summary.pvcCount, 0);
+  assert.match(storage.message, /unavailable/);
 });
 
 test("quantity parsers handle Kubernetes CPU and memory suffixes", () => {

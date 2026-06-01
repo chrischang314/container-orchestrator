@@ -17,6 +17,12 @@ and in-cluster service-account environment variables are present.
   Kubernetes API. When Metrics API access is available, the same payload also
   includes read-only capacity data: node CPU/memory pressure and the top
   memory-consuming pods.
+- The cluster payload includes a read-only `storage` inventory when PVC access
+  is available. It maps PVCs to PVs, StorageClasses, and consuming workloads
+  when those reads are allowed; local-path or other node-local claims are marked
+  high risk, and pending/lost/unbound claims are marked for attention. If PV or
+  StorageClass reads are denied, `/api/cluster` still returns the PVC inventory
+  with `storage.partial=true`.
 - `POST /api/action` runs built-in node and deployment controls through a
   validated `kubectl` invocation. Mutating actions require a UI confirmation
   and a backend `confirmed: true` receipt before execution.
@@ -36,3 +42,5 @@ Capacity summaries remain available in public status mode, but detailed top-pod
 names are omitted. Deployments intentionally scaled to `0` replicas are treated
 as inactive rather than unhealthy so dormant worker switches do not create false
 public attention.
+Storage summaries remain available in public status mode, but PVC names, PV
+names, and workload-specific storage details are omitted.

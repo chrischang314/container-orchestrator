@@ -14,7 +14,7 @@ rbac:
   clusterRoleName: k8s-management-ui
   rules:
     - apiGroups: [""]
-      resources: ["nodes", "nodes/status", "namespaces", "pods", "pods/log", "services", "endpoints", "events"]
+      resources: ["nodes", "nodes/status", "namespaces", "pods", "pods/log", "services", "endpoints", "events", "persistentvolumeclaims", "persistentvolumes"]
       verbs: ["get", "list", "watch"]
     - apiGroups: [""]
       resources: ["nodes"]
@@ -36,6 +36,9 @@ rbac:
       verbs: ["get", "patch", "update"]
     - apiGroups: ["metrics.k8s.io"]
       resources: ["nodes", "pods"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: ["storage.k8s.io"]
+      resources: ["storageclasses"]
       verbs: ["get", "list", "watch"]
 
 services:

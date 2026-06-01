@@ -159,6 +159,7 @@ function publicClusterSnapshot(snapshot) {
     },
     nodes,
     capacity: publicCapacitySnapshot(snapshot.capacity),
+    storage: publicStorageSnapshot(snapshot.storage),
     externalWorkers: rawExternalWorkers.map((worker) => ({
       name: worker.name,
       online: Boolean(worker.online),
@@ -196,6 +197,29 @@ function publicCapacitySnapshot(capacity) {
       elevatedMemoryNodes: Number(capacity.summary?.elevatedMemoryNodes || 0),
       highMemoryNodes: Number(capacity.summary?.highMemoryNodes || 0),
       maxMemoryPercent: capacity.summary?.maxMemoryPercent ?? null
+    }
+  };
+}
+
+function publicStorageSnapshot(storage) {
+  if (!storage) return undefined;
+  return {
+    available: Boolean(storage.available),
+    partial: Boolean(storage.partial),
+    source: storage.source,
+    message: storage.available ? storage.message : "Storage inventory unavailable.",
+    summary: {
+      pvcCount: Number(storage.summary?.pvcCount || 0),
+      bound: Number(storage.summary?.bound || 0),
+      pending: Number(storage.summary?.pending || 0),
+      lost: Number(storage.summary?.lost || 0),
+      highRisk: Number(storage.summary?.highRisk || 0),
+      attention: Number(storage.summary?.attention || 0),
+      localPath: Number(storage.summary?.localPath || 0),
+      network: Number(storage.summary?.network || 0),
+      unknownStorage: Number(storage.summary?.unknownStorage || 0),
+      namespaces: Number(storage.summary?.namespaces || 0),
+      storageClasses: Number(storage.summary?.storageClasses || 0)
     }
   };
 }
