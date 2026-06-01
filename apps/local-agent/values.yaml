@@ -21,7 +21,7 @@ services:
     serviceName: local-agent-backend
     image: ghcr.io/chrischang314/local-agent/backend
     tag: main
-    digest: "sha256:b78cd7ed5c8e4e3265b45a1645d6fb6dfc3e0287d7dd395cc142c0d43578fc6f"
+    digest: "sha256:35b4e908ff2b1a55c9f40b730adf29d27a5e3f4a6342fcb6390d9fd6cb192414"
     autoDeploy:
       enabled: false
     port: 8000
@@ -140,7 +140,7 @@ services:
     serviceName: local-agent-frontend
     image: ghcr.io/chrischang314/local-agent/frontend
     tag: main
-    digest: "sha256:fe539a892f566ac125c19f9508a6effcdf0cc5cd6fa66291342d326d51c385ac"
+    digest: "sha256:b4b3a3e6bcba76aa296b61ae814c312a171ead7fe11a4d2ea4758e6e4b93aa11"
     autoDeploy:
       enabled: false
     serviceType: LoadBalancer
@@ -178,7 +178,7 @@ services:
     serviceName: local-agent-worker
     image: ghcr.io/chrischang314/local-agent/worker
     tag: main
-    digest: "sha256:436ec1da31097862e6e2673a92e0038d454a477097610c265c07fa2d38ffb46a"
+    digest: "sha256:0c6ccb5e19564166a882d010f703185aab0aa1a5eb1f99dffdbe902af45e4177"
     autoDeploy:
       enabled: false
     port: 8080
