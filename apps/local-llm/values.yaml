@@ -21,6 +21,8 @@ services:
     tag: main
     port: 8000
     replicas: 1
+    strategy:
+      type: Recreate
     nodeSelector:
       kubernetes.io/hostname: mac-mini-worker
     hostAliases:

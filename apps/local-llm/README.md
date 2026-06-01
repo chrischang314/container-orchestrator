@@ -47,3 +47,5 @@ Persistent chat history (`/app/data`) survives the rollover.
 
 The backend has a 1 Gi PVC mounted at `/app/data` for chat history. Bump
 `services[0].persistence[0].size` in `values.yaml` if you fill it up.
+The backend uses a `Recreate` rollout so Keel image updates stop the old pod
+before starting the next one against the same SQLite/JWT-secret volume.

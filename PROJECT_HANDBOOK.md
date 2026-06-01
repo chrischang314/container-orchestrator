@@ -63,6 +63,9 @@ they are the direct cause of the outage.
 - Local Agent's backend is a singleton on `mac-mini-worker` and uses
   `strategy.type: Recreate`; a default surge rollout can leave upgrades stuck
   because the node may not fit a second backend pod.
+- Local LLM's backend is a PVC-backed singleton using SQLite plus a persisted
+  JWT signing key under `/app/data`; keep `strategy.type: Recreate` so Keel
+  updates never overlap two pods on the same account/session volume.
 - Model Trading Bot's backend is also a PVC-backed singleton on
   `mac-mini-worker`. Keep `strategy.type: Recreate`, `/health` readiness, and
   TCP liveness so transient Synology NFS or provider stalls do not cause
