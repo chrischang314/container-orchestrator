@@ -21,7 +21,7 @@ services:
     serviceName: local-agent-backend
     image: ghcr.io/chrischang314/local-agent/backend
     tag: main
-    digest: "sha256:906af9a4cd01005154f8ef4f68354548f0dcd143817ed64b406013370996792f"
+    digest: "sha256:560e9760043621405fbe67b479cfb882dba5eaf5de77e52437aeaba615d65b5a"
     autoDeploy:
       enabled: false
     port: 8000
@@ -54,9 +54,9 @@ services:
       - name: LOCAL_AGENT_AUTH_REGISTRATION_ENABLED
         value: "true"
       - name: LOCAL_AGENT_AGENT_EXECUTION_ENABLED
-        value: "false"
+        value: "true"
       - name: LOCAL_AGENT_DESKTOP_ISOLATION_ENABLED
-        value: "false"
+        value: "true"
       - name: LOCAL_AGENT_DESKTOP_ISOLATION_BACKEND
         value: synthetic
       - name: LOCAL_AGENT_GRAPH_CHECKPOINT_PATH
@@ -72,7 +72,7 @@ services:
           secretKeyRef:
             name: local-agent-worker-auth
             key: token
-            optional: true
+            optional: false
       - name: LOCAL_AGENT_MODEL_WORKER_NAMESPACE
         value: local-agent-model-workers
       - name: LOCAL_AGENT_MODEL_WORKER_SWITCH_LABEL
@@ -93,7 +93,7 @@ services:
     resources:
       requests:
         cpu: 250m
-        memory: 512Mi
+        memory: 256Mi
       limits:
         memory: 2Gi
     securityContext:
@@ -140,7 +140,7 @@ services:
     serviceName: local-agent-frontend
     image: ghcr.io/chrischang314/local-agent/frontend
     tag: main
-    digest: "sha256:209327b369b71d945d8f096db695936e59b4711644947873ec9fc992c938145f"
+    digest: "sha256:1acb4da0d34f67ce689e7dcafb732b1572f4638de9d3e1692e799f339012d70d"
     autoDeploy:
       enabled: false
     serviceType: LoadBalancer
@@ -174,25 +174,26 @@ services:
   - name: worker
     serviceAccountName: local-agent-worker
     automountServiceAccountToken: false
+    enableServiceLinks: false
     serviceName: local-agent-worker
     image: ghcr.io/chrischang314/local-agent/worker
     tag: main
-    digest: "sha256:b296efb53bc4d6931bed8e6a5f0d681769171c9f04a15f17cc66a521726a8f7c"
+    digest: "sha256:52d2db17400e95acd05248b9de6cdfb9e402f96fa60bd7b68239b348ef8cac29"
     autoDeploy:
       enabled: false
     port: 8080
-    # The current control-plane deployment keeps execution disabled. Scale this
-    # up only after worker execution is intentionally enabled.
-    replicas: 0
+    strategy:
+      type: Recreate
+    replicas: 1
     nodeSelector:
       kubernetes.io/hostname: mac-mini-worker
     env:
       - name: LOCAL_AGENT_WORKER_BROWSER_ENABLED
-        value: "false"
+        value: "true"
       - name: LOCAL_AGENT_WORKER_CODING_ENABLED
-        value: "false"
+        value: "true"
       - name: LOCAL_AGENT_WORKER_DESKTOP_ENABLED
-        value: "false"
+        value: "true"
       - name: LOCAL_AGENT_WORKER_DESKTOP_BACKEND
         value: synthetic
       - name: LOCAL_AGENT_WORKER_DESKTOP_VNC_HOST
@@ -202,23 +203,25 @@ services:
       - name: LOCAL_AGENT_WORKER_DESKTOP_VNC_PORT
         value: "5900"
       - name: LOCAL_AGENT_WORKER_MCP_ENABLED
-        value: "false"
+        value: "true"
       - name: LOCAL_AGENT_WORKER_SMOLAGENTS_ENABLED
-        value: "false"
+        value: "true"
       - name: LOCAL_AGENT_WORKER_WEB_ENABLED
-        value: "false"
+        value: "true"
+      - name: LOCAL_AGENT_WORKER_PORT
+        value: "8080"
       - name: LOCAL_AGENT_WORKER_AUTH_TOKEN
         valueFrom:
           secretKeyRef:
             name: local-agent-worker-auth
             key: token
-            optional: true
+            optional: false
       - name: LOCAL_AGENT_WORKER_ARTIFACT_BASE
         value: /worker/artifacts
     resources:
       requests:
-        cpu: 250m
-        memory: 512Mi
+        cpu: 10m
+        memory: 8Mi
       limits:
         memory: 2Gi
     securityContext:
