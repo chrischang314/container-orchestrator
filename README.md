@@ -281,6 +281,13 @@ repository before Keel rolls the UI in-cluster. The same image also powers the
 internal `k8s-cluster-status` read-only service used by the public portfolio's
 `/cluster-status/` proxy.
 
+`k8s.lan` includes a read-only capacity panel backed by the Kubernetes Metrics
+API. `/api/cluster` reports node CPU/memory pressure and top memory-consuming
+pods when `metrics.k8s.io` is available, and keeps the rest of the cluster
+snapshot online with a clear unavailable state if Metrics API access fails. The
+public status deployment keeps detailed pod names out of its sanitized payload
+and treats `replicas: 0` deployments as inactive rather than unhealthy.
+
 For faster public deploys, the polling can be replaced by a webhook from
 Actions.
 

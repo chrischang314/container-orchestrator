@@ -6,6 +6,23 @@ const https = require("node:https");
 const DEFAULT_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token";
 const DEFAULT_CA_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 const EXTERNAL_WORKER_COMPONENT = "external-worker-switch";
+const TOP_PODS_LIMIT = 8;
+const MEMORY_ELEVATED_PERCENT = 70;
+const MEMORY_HIGH_PERCENT = 85;
+const MEMORY_FACTORS = new Map([
+  ["Ki", 1024],
+  ["Mi", 1024 ** 2],
+  ["Gi", 1024 ** 3],
+  ["Ti", 1024 ** 4],
+  ["Pi", 1024 ** 5],
+  ["Ei", 1024 ** 6],
+  ["K", 1000],
+  ["M", 1000 ** 2],
+  ["G", 1000 ** 3],
+  ["T", 1000 ** 4],
+  ["P", 1000 ** 5],
+  ["E", 1000 ** 6]
+]);
 
 function shouldUseDemoMode(env = process.env) {
   if (env.K8S_UI_DEMO === "true") return true;
@@ -40,17 +57,217 @@ function containerSummary(container, statuses = []) {
   };
 }
 
+function parseCpuMillis(value) {
+  const text = String(value || "").trim();
+  if (!text) return null;
+  const match = text.match(/^([+-]?\d+(?:\.\d+)?)(n|u|m)?$/);
+  if (!match) return null;
+  const amount = Number(match[1]);
+  if (!Number.isFinite(amount)) return null;
+  switch (match[2]) {
+    case "n":
+      return amount / 1_000_000;
+    case "u":
+      return amount / 1_000;
+    case "m":
+      return amount;
+    default:
+      return amount * 1000;
+  }
+}
+
+function parseMemoryBytes(value) {
+  const text = String(value || "").trim();
+  if (!text) return null;
+  const match = text.match(/^([+-]?\d+(?:\.\d+)?)([A-Za-z]+)?$/);
+  if (!match) return null;
+  const amount = Number(match[1]);
+  if (!Number.isFinite(amount)) return null;
+  const suffix = match[2] || "";
+  if (!suffix) return amount;
+  if (suffix === "m") return amount / 1000;
+  const factor = MEMORY_FACTORS.get(suffix);
+  return factor ? amount * factor : null;
+}
+
+function roundMetric(value, digits = 1) {
+  if (!Number.isFinite(value)) return null;
+  const factor = 10 ** digits;
+  return Math.round(value * factor) / factor;
+}
+
+function percentUsed(usage, basis) {
+  if (!Number.isFinite(usage) || !Number.isFinite(basis) || basis <= 0) return null;
+  return roundMetric((usage / basis) * 100, 1);
+}
+
+function capacitySeverity(memoryPercent) {
+  if (!Number.isFinite(memoryPercent)) return "unknown";
+  if (memoryPercent >= MEMORY_HIGH_PERCENT) return "high";
+  if (memoryPercent >= MEMORY_ELEVATED_PERCENT) return "elevated";
+  return "normal";
+}
+
+function formatCpuMillis(value) {
+  if (!Number.isFinite(value)) return "";
+  if (value >= 1000) return `${roundMetric(value / 1000, 2)} cores`;
+  return `${roundMetric(value, 1)}m`;
+}
+
+function formatMemoryBytes(value) {
+  if (!Number.isFinite(value)) return "";
+  const units = [
+    ["Ti", 1024 ** 4],
+    ["Gi", 1024 ** 3],
+    ["Mi", 1024 ** 2],
+    ["Ki", 1024]
+  ];
+  for (const [unit, factor] of units) {
+    if (Math.abs(value) >= factor) return `${roundMetric(value / factor, 1)}${unit}`;
+  }
+  return `${roundMetric(value, 0)}B`;
+}
+
+function metricErrors(metricsApi = {}) {
+  return (metricsApi.errors || []).filter(Boolean);
+}
+
+function unavailableCapacity(metricsApi = {}) {
+  const errors = metricErrors(metricsApi);
+  return {
+    available: false,
+    source: "metrics.k8s.io/v1beta1",
+    message: errors.length ? "Metrics API unavailable." : "Metrics API returned no node or pod metrics.",
+    errors,
+    nodes: [],
+    topPods: [],
+    summary: {
+      nodeCount: 0,
+      topPodCount: 0,
+      elevatedMemoryNodes: 0,
+      highMemoryNodes: 0,
+      maxMemoryPercent: null
+    }
+  };
+}
+
+function mapCapacity(raw, podNodeNames = new Map()) {
+  const metricsApi = raw.metricsApi || {};
+  const nodeMetricItems = metricsApi.nodes?.items || [];
+  const podMetricItems = metricsApi.pods?.items || [];
+  const hasMetrics = nodeMetricItems.length > 0 || podMetricItems.length > 0;
+  if (!hasMetrics) return unavailableCapacity(metricsApi);
+
+  const nodeMetrics = new Map(nodeMetricItems.map((item) => [item.metadata?.name || "", item]));
+  const nodes = (raw.nodes?.items || []).map((node) => {
+    const name = node.metadata?.name || "";
+    const metric = nodeMetrics.get(name);
+    const allocatable = node.status?.allocatable || {};
+    const capacity = node.status?.capacity || {};
+    const cpuBasis = allocatable.cpu || capacity.cpu || "";
+    const memoryBasis = allocatable.memory || capacity.memory || "";
+    const cpuUsageMillis = parseCpuMillis(metric?.usage?.cpu);
+    const cpuBasisMillis = parseCpuMillis(cpuBasis);
+    const memoryUsageBytes = parseMemoryBytes(metric?.usage?.memory);
+    const memoryBasisBytes = parseMemoryBytes(memoryBasis);
+    const memoryPercent = percentUsed(memoryUsageBytes, memoryBasisBytes);
+
+    return {
+      name,
+      cpu: {
+        usage: metric?.usage?.cpu || "",
+        usageDisplay: formatCpuMillis(cpuUsageMillis),
+        usageMillis: roundMetric(cpuUsageMillis, 3),
+        basis: cpuBasis,
+        basisDisplay: formatCpuMillis(cpuBasisMillis),
+        basisMillis: roundMetric(cpuBasisMillis, 3),
+        percentUsed: percentUsed(cpuUsageMillis, cpuBasisMillis)
+      },
+      memory: {
+        usage: metric?.usage?.memory || "",
+        usageDisplay: formatMemoryBytes(memoryUsageBytes),
+        usageBytes: roundMetric(memoryUsageBytes, 0),
+        basis: memoryBasis,
+        basisDisplay: formatMemoryBytes(memoryBasisBytes),
+        basisBytes: roundMetric(memoryBasisBytes, 0),
+        percentUsed: memoryPercent
+      },
+      severity: capacitySeverity(memoryPercent)
+    };
+  });
+
+  const topPods = podMetricItems
+    .map((podMetric) => {
+      const namespace = podMetric.metadata?.namespace || "default";
+      const name = podMetric.metadata?.name || "";
+      const containers = podMetric.containers || [];
+      const cpuUsageMillis = containers.reduce((sum, container) => {
+        const value = parseCpuMillis(container.usage?.cpu);
+        return sum + (Number.isFinite(value) ? value : 0);
+      }, 0);
+      const memoryUsageBytes = containers.reduce((sum, container) => {
+        const value = parseMemoryBytes(container.usage?.memory);
+        return sum + (Number.isFinite(value) ? value : 0);
+      }, 0);
+
+      return {
+        namespace,
+        name,
+        nodeName: podNodeNames.get(`${namespace}/${name}`) || "",
+        containers: containers.length,
+        cpu: {
+          usageDisplay: formatCpuMillis(cpuUsageMillis),
+          usageMillis: roundMetric(cpuUsageMillis, 3)
+        },
+        memory: {
+          usageDisplay: formatMemoryBytes(memoryUsageBytes),
+          usageBytes: roundMetric(memoryUsageBytes, 0)
+        }
+      };
+    })
+    .sort((left, right) =>
+      (right.memory.usageBytes || 0) - (left.memory.usageBytes || 0) ||
+      left.namespace.localeCompare(right.namespace) ||
+      left.name.localeCompare(right.name)
+    )
+    .slice(0, TOP_PODS_LIMIT);
+
+  const memoryPercents = nodes
+    .map((node) => node.memory.percentUsed)
+    .filter((value) => Number.isFinite(value));
+
+  return {
+    available: true,
+    source: "metrics.k8s.io/v1beta1",
+    message: metricErrors(metricsApi).length ? "Metrics API partially available." : "Metrics API available.",
+    errors: metricErrors(metricsApi),
+    nodes,
+    topPods,
+    summary: {
+      nodeCount: nodes.length,
+      topPodCount: topPods.length,
+      elevatedMemoryNodes: nodes.filter((node) => node.severity === "elevated").length,
+      highMemoryNodes: nodes.filter((node) => node.severity === "high").length,
+      maxMemoryPercent: memoryPercents.length ? Math.max(...memoryPercents) : null
+    }
+  };
+}
+
 function mapClusterSnapshot(raw, now = new Date()) {
   const podItems = raw.pods?.items || [];
   const deploymentItems = raw.deployments?.items || [];
   const podsByNode = new Map();
+  const podNodeNames = new Map();
 
   for (const pod of podItems) {
     const nodeName = pod.spec?.nodeName || "unassigned";
+    const namespace = pod.metadata?.namespace || "default";
+    const name = pod.metadata?.name || "";
+    podNodeNames.set(`${namespace}/${name}`, nodeName);
     if (!podsByNode.has(nodeName)) podsByNode.set(nodeName, []);
     podsByNode.get(nodeName).push({
-      namespace: pod.metadata?.namespace || "default",
-      name: pod.metadata?.name || "",
+      namespace,
+      name,
       phase: pod.status?.phase || "Unknown",
       hostIP: pod.status?.hostIP || "",
       podIP: pod.status?.podIP || "",
@@ -86,7 +303,9 @@ function mapClusterSnapshot(raw, now = new Date()) {
       architecture: node.status?.nodeInfo?.architecture || "",
       capacity: {
         cpu: node.status?.capacity?.cpu || "",
-        memory: node.status?.capacity?.memory || ""
+        memory: node.status?.capacity?.memory || "",
+        allocatableCpu: node.status?.allocatable?.cpu || "",
+        allocatableMemory: node.status?.allocatable?.memory || ""
       },
       addresses: node.status?.addresses || [],
       pods,
@@ -158,7 +377,8 @@ function mapClusterSnapshot(raw, now = new Date()) {
     nodes,
     externalWorkers,
     deployments,
-    containers
+    containers,
+    capacity: mapCapacity(raw, podNodeNames)
   };
 }
 
@@ -191,14 +411,33 @@ function createKubernetesClient(options = {}) {
   return {
     mode: "cluster",
     async snapshot() {
-      const [nodes, pods, deployments] = await Promise.all([
+      const [nodes, pods, deployments, nodeMetrics, podMetrics] = await Promise.all([
         request("/api/v1/nodes"),
         request("/api/v1/pods"),
-        request("/apis/apps/v1/deployments")
+        request("/apis/apps/v1/deployments"),
+        optionalRequest(request, "/apis/metrics.k8s.io/v1beta1/nodes"),
+        optionalRequest(request, "/apis/metrics.k8s.io/v1beta1/pods")
       ]);
-      return mapClusterSnapshot({ nodes, pods, deployments }, new Date());
+      return mapClusterSnapshot({
+        nodes,
+        pods,
+        deployments,
+        metricsApi: {
+          nodes: nodeMetrics.data,
+          pods: podMetrics.data,
+          errors: [nodeMetrics.error, podMetrics.error].filter(Boolean)
+        }
+      }, new Date());
     }
   };
+}
+
+async function optionalRequest(request, path) {
+  try {
+    return { data: await request(path), error: "" };
+  } catch (error) {
+    return { data: null, error: `${path}: ${error.message}` };
+  }
 }
 
 function httpsJson(url, token, ca) {
@@ -251,6 +490,7 @@ function demoRawCluster() {
           spec: {},
           status: {
             capacity: { cpu: "4", memory: "7864320Ki" },
+            allocatable: { cpu: "3800m", memory: "7240Mi" },
             addresses: [{ type: "InternalIP", address: "192.168.4.56" }],
             conditions: [{ type: "Ready", status: "True", reason: "KubeletReady" }],
             nodeInfo: { kubeletVersion: "v1.34.1+k3s1", osImage: "Debian GNU/Linux 12", architecture: "arm64" }
@@ -266,6 +506,7 @@ function demoRawCluster() {
           spec: { unschedulable: false },
           status: {
             capacity: { cpu: "10", memory: "16777216Ki" },
+            allocatable: { cpu: "9500m", memory: "15360Mi" },
             addresses: [{ type: "InternalIP", address: "192.168.4.24" }],
             conditions: [{ type: "Ready", status: "True", reason: "KubeletReady" }],
             nodeInfo: { kubeletVersion: "v1.34.1+k3s1", osImage: "Ubuntu 24.04 LTS", architecture: "arm64" }
@@ -301,7 +542,42 @@ function demoRawCluster() {
         deployment("default", "model-trading-bot-backend", 1, 1),
         externalWorkerDeployment("local-llm", "chris-pc-2-ollama-switch", "chris-pc-2", 1, 1)
       ]
+    },
+    metricsApi: {
+      nodes: {
+        items: [
+          nodeMetric("rpi5-control", "512m", "5320Mi"),
+          nodeMetric("mac-mini-worker", "2200m", "10920Mi")
+        ]
+      },
+      pods: {
+        items: [
+          podMetric("default", "pihole-6f9fb77c8d-n2z7x", [["pihole", "45m", "154Mi"]]),
+          podMetric("default", "homebridge-5847b7d9b5-tfm2m", [["homebridge", "82m", "238Mi"]]),
+          podMetric("default", "k8s-management-ui-web-6447596f7c-nx7qk", [["web", "31m", "72Mi"]]),
+          podMetric("default", "local-llm-frontend-75dd47d6b8-bnlq8", [["frontend", "105m", "188Mi"]]),
+          podMetric("default", "model-trading-bot-backend-8b9775d9bc-r5p7d", [["backend", "410m", "724Mi"]])
+        ]
+      },
+      errors: []
     }
+  };
+}
+
+function nodeMetric(name, cpu, memory) {
+  return {
+    metadata: { name },
+    usage: { cpu, memory }
+  };
+}
+
+function podMetric(namespace, name, containers) {
+  return {
+    metadata: { namespace, name },
+    containers: containers.map(([containerName, cpu, memory]) => ({
+      name: containerName,
+      usage: { cpu, memory }
+    }))
   };
 }
 
@@ -368,9 +644,13 @@ function externalWorkerDeployment(namespace, name, worker, replicas, readyReplic
 }
 
 module.exports = {
+  capacitySeverity,
   createKubernetesClient,
   demoRawCluster,
   httpsJson,
+  mapCapacity,
   mapClusterSnapshot,
+  parseCpuMillis,
+  parseMemoryBytes,
   shouldUseDemoMode
 };

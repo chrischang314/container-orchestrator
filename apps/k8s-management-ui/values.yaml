@@ -34,6 +34,9 @@ rbac:
     - apiGroups: ["apps"]
       resources: ["deployments/scale"]
       verbs: ["get", "patch", "update"]
+    - apiGroups: ["metrics.k8s.io"]
+      resources: ["nodes", "pods"]
+      verbs: ["get", "list", "watch"]
 
 services:
   - name: web

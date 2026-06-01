@@ -36,6 +36,8 @@ test("server exposes health, cluster, and command endpoints", async () => {
 
     const cluster = await getJson(`${base}/api/cluster`);
     assert.equal(cluster.summary.nodes, 2);
+    assert.equal(cluster.capacity.available, true);
+    assert.equal(cluster.capacity.topPods.length > 0, true);
 
     const command = await postJson(`${base}/api/command`, { command: "kubectl get nodes" });
     assert.equal(command.ok, true);
@@ -202,10 +204,14 @@ test("public status mode serves sanitized cluster data and blocks controls", asy
     assert.equal(cluster.summary.nodes, 2);
     assert.equal(cluster.summary.readyDeployments, 6);
     assert.equal(cluster.summary.externalWorkers, 1);
+    assert.equal(cluster.capacity.available, true);
+    assert.equal(cluster.capacity.topPods, undefined);
+    assert.equal(cluster.nodes[0].capacity.memory.percentUsed, 73.5);
     assert.equal(cluster.externalWorkers[0].name, "chris-pc-2");
     assert.equal(cluster.nodes[0].containers, undefined);
     assert.equal(cluster.containers, undefined);
     assert.equal(JSON.stringify(cluster).includes("pihole-6f9fb77c8d-n2z7x"), false);
+    assert.equal(JSON.stringify(cluster).includes("model-trading-bot-backend-8b9775d9bc-r5p7d"), false);
     assert.equal(JSON.stringify(cluster).includes("ghcr.io"), false);
 
     const html = await getText(`${base}/`);
@@ -214,6 +220,44 @@ test("public status mode serves sanitized cluster data and blocks controls", asy
 
     const command = await postJson(`${base}/api/command`, { command: "kubectl get nodes" }, 403);
     assert.equal(command.ok, false);
+  } finally {
+    await close(server);
+  }
+});
+
+test("public status mode treats scaled-to-zero deployments as inactive", async () => {
+  const raw = demoRawCluster();
+  raw.deployments.items.push({
+    metadata: { namespace: "local-agent-model-workers", name: "chris-pc-1-model-switch" },
+    spec: { replicas: 0 },
+    status: { readyReplicas: 0, updatedReplicas: 0, availableReplicas: 0 }
+  });
+
+  const server = createServer({
+    env: {
+      K8S_UI_DEMO: "true",
+      K8S_UI_PUBLIC_STATUS: "true"
+    },
+    client: {
+      mode: "test",
+      async snapshot() {
+        return mapClusterSnapshot(raw, new Date("2026-05-17T12:00:00Z"));
+      }
+    }
+  });
+
+  await listen(server);
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const cluster = await getJson(`${base}/api/cluster`);
+
+    assert.equal(cluster.summary.deployments, 7);
+    assert.equal(cluster.summary.readyDeployments, 7);
+    assert.equal(cluster.health.workloads, "healthy");
+    const inactiveNamespace = cluster.namespaces.find((item) => item.namespace === "local-agent-model-workers");
+    assert.equal(inactiveNamespace.readyDeployments, 1);
+    assert.equal(inactiveNamespace.readyReplicas, 0);
+    assert.equal(inactiveNamespace.replicas, 0);
   } finally {
     await close(server);
   }
