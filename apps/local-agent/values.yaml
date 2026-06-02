@@ -21,7 +21,7 @@ services:
     serviceName: local-agent-backend
     image: ghcr.io/chrischang314/local-agent/backend
     tag: main
-    digest: "sha256:52e968abe151b3e047b2cb9fd809a2d54c999d3aea34953839df5c9003f8dafe"
+    digest: "sha256:a1710f5bb47f5f24d49801571184718374e0350c3c06be6168113b9551d7f691"
     autoDeploy:
       enabled: false
     port: 8000
@@ -33,6 +33,8 @@ services:
     nodeSelector:
       kubernetes.io/hostname: mac-mini-worker
     env:
+      - name: LOCAL_AGENT_ENVIRONMENT
+        value: production
       - name: LOCAL_AGENT_DATABASE_PATH
         value: /app/data/local-agent.sqlite3
       - name: LOCAL_AGENT_RETRIEVAL_STORE_PATH
@@ -153,7 +155,7 @@ services:
     serviceName: local-agent-frontend
     image: ghcr.io/chrischang314/local-agent/frontend
     tag: main
-    digest: "sha256:b286379f55346a015e47b54a085b0b126f59b6908dc2bff8547a207b01e87d68"
+    digest: "sha256:a79cf49c5c81e9c2c54ecbee2a5fb24b231acfb54aa7a02abe7d88c819fe6fcd"
     autoDeploy:
       enabled: false
     serviceType: LoadBalancer
@@ -191,7 +193,7 @@ services:
     serviceName: local-agent-worker
     image: ghcr.io/chrischang314/local-agent/worker
     tag: main
-    digest: "sha256:1aa22d0e7e33de14d26d30c5b8ba242421e1d999d10fbd9f04b9aaf56813a5d3"
+    digest: "sha256:ccf31b28b183753f99a6cfc85f27a0325a59bb79ee9e65c70d7d024978dd6d4b"
     autoDeploy:
       enabled: false
     port: 8080
