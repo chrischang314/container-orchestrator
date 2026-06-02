@@ -21,6 +21,12 @@ if [[ -z "$CTX" ]]; then
 fi
 echo "Deploying to context: $CTX"
 
+SHARED_AUTH_PVC="$ROOT/platform/shared-auth-pvc.yaml"
+if [[ -f "$SHARED_AUTH_PVC" ]]; then
+  echo "Ensuring shared projects.lan SSO PVC exists"
+  kubectl apply -f "$SHARED_AUTH_PVC"
+fi
+
 shopt -s nullglob
 APPS=("$ROOT"/apps/*/values.yaml)
 if [[ ${#APPS[@]} -eq 0 ]]; then

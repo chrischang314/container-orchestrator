@@ -117,6 +117,16 @@ on a `Recreate` rollout, dependency-aware `/health` readiness, and TCP liveness
 so brief NFS or data-provider stalls do not cause liveness restarts while the
 frontend remains available through `modeltradingbot.lan`.
 
+Projects LAN apps share one server-side SSO contract through the platform-owned
+`shared-auth-nfs` PVC mounted at `/shared-auth`. `make deploy` applies
+`platform/shared-auth-pvc.yaml` before Helm upgrades apps, then participating
+server-side backends mount `/shared-auth/auth.db` through `existingClaim` and
+read/write the HttpOnly `projects_lan_session` cookie against shared `users` and
+`auth_sessions` rows. The reliable browser surface is `projects.lan/<app>` path
+proxying with a host-scoped cookie; the home launchpad should link users to
+those routes by default. Direct `.lan` hostnames remain useful diagnostics, but
+do not assume a browser will accept a cookie for the pseudo-domain `.lan`.
+
 ## Day-1 setup, end to end
 
 1. **Enable Kubernetes in Docker Desktop** —

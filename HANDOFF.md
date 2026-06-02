@@ -179,6 +179,7 @@ Current local-cache PVC-backed workloads:
 | PVC | Current purpose |
 |---|---|
 | `postgres-postgres-pgdata` | Recruiting PostgreSQL database on Synology NFS |
+| `shared-auth-nfs` | Platform-owned projects LAN shared SSO SQLite DB mounted at `/shared-auth` for server-side app backends |
 | `model-trading-bot-backend-data-nfs` | Trading bot backend data on Synology NFS |
 | `trading-bot-public-cache` | Public trading-bot dashboard cache; synced back to `trading-bot-parquet` by `trading-bot-cache-sync` |
 | `local-llm-backend-data-nfs` | Local LLM app data on Synology NFS |
@@ -197,8 +198,21 @@ they can be rebuilt before migrating.
 Synology-backed PVCs are currently `trading-bot/trading-bot-parquet`,
 `trading-bot/redis-data-redis-0`, `default/postgres-postgres-pgdata`,
 `default/model-trading-bot-backend-data-nfs`, `default/local-llm-backend-data-nfs`,
-`default/recruiting-app-*-nfs`, `local-llm/local-llm-chat-data`, and
+`default/shared-auth-nfs`, `default/recruiting-app-*-nfs`, `local-llm/local-llm-chat-data`, and
 `local-llm/ollama-model-cache`.
+
+## Projects LAN SSO
+
+Participating LAN apps use the shared server-side session contract:
+`SHARED_AUTH_DB=/shared-auth/auth.db`, cookie name `projects_lan_session`, and
+the platform-owned `shared-auth-nfs` RWX PVC mounted only into server-side
+auth-capable backends. `make deploy` applies `platform/shared-auth-pvc.yaml`
+before Helm upgrades apps so fresh clusters can create the claim before pods
+mount it. Keep the cookie host-scoped for `projects.lan` path-proxied app routes
+unless browser testing proves a wider `.lan` domain cookie is reliable. The
+home launchpad should send users to canonical `http://projects.lan/<app>/`
+routes by default; direct hostnames such as `localllm.lan` and
+`modeltradingbot.lan` remain diagnostics.
 
 `trading-bot-cache-sync` runs every 15 minutes in the `trading-bot` namespace.
 It mounts `trading-bot-public-cache` plus `trading-bot-parquet`, copies stable

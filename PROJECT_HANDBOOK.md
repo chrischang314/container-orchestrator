@@ -70,3 +70,28 @@ they are the direct cause of the outage.
   `mac-mini-worker`. Keep `strategy.type: Recreate`, `/health` readiness, and
   TCP liveness so transient Synology NFS or provider stalls do not cause
   liveness restart loops.
+
+## Projects LAN Shared SSO
+
+The LAN app suite uses a shared server-side auth contract. Participating
+backends mount the platform-owned `shared-auth-nfs` RWX PVC at `/shared-auth`
+and set `SHARED_AUTH_DB=/shared-auth/auth.db`. `make deploy` applies
+`platform/shared-auth-pvc.yaml` before any Helm app upgrade so a fresh cluster
+can create the claim before pods mount it. The database stores app-neutral
+`users` and hashed `auth_sessions`; browsers prove identity with the HttpOnly
+`projects_lan_session` cookie.
+
+Prefer `projects.lan/<app>` path-proxied routes for human navigation and
+first-pass SSO verification, because a host-scoped cookie on `projects.lan` is
+reliable. Direct legacy hosts such as `localllm.lan` and `modeltradingbot.lan`
+can stay available as diagnostics, but do not assume a broad `.lan` cookie will
+work in every browser. A future
+`*.projects.lan` subdomain layout can use a parent `.projects.lan` cookie if
+DNS and ingress are updated together.
+
+SQLite writes to the shared auth DB should stay low-volume. Keep backend
+replicas at one where they write sessions, preserve `Recreate` rollout strategy
+for PVC-backed singleton backends, and make app code use busy timeouts/WAL where
+available. Never mount `shared-auth-nfs` into public-only frontends, public
+internet deployments, or app-specific private secret paths unless there is an
+explicit security decision.

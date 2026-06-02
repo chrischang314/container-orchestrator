@@ -9,6 +9,10 @@ metadata:
   namespace: {{ $.Values.namespace | default "default" }}
   labels:
     {{- include "app.serviceLabels" (dict "root" $ "service" $svc) | nindent 4 }}
+  {{- if $pvc.keep }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
 spec:
   accessModes:
     - {{ default "ReadWriteOnce" $pvc.accessMode }}

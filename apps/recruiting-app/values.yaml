@@ -48,6 +48,12 @@ services:
         value: "6000"
       - name: HF_HOME
         value: /app/.hf-cache
+      - name: SHARED_AUTH_DB
+        value: /shared-auth/auth.db
+      - name: PROJECTS_LAN_COOKIE_NAME
+        value: projects_lan_session
+      - name: PROJECTS_LAN_LOGIN_URL
+        value: http://projects.lan/api/auth/login
 
     hostAliases:
       - ip: 192.168.5.2
@@ -85,6 +91,9 @@ services:
         mountPath: /app/.hf-cache
         size: 5Gi
         storageClassName: synology-nfs
+      - name: shared-auth
+        existingClaim: shared-auth-nfs
+        mountPath: /shared-auth
 
   # ── Scraper daemon ─────────────────────────────────────────────────────────
   - name: scraper

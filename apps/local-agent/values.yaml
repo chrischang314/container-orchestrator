@@ -50,9 +50,11 @@ services:
       - name: LOCAL_AGENT_SHARED_AUTH_DB
         value: /shared-auth/auth.db
       - name: LOCAL_AGENT_AUTH_SECRET_FILE
-        value: /shared-auth/local-agent-jwt-secret
+        value: /app/data/auth/local-agent-jwt-secret
       - name: LOCAL_AGENT_AUTH_REGISTRATION_ENABLED
         value: "true"
+      - name: LOCAL_AGENT_OPERATOR_USERS
+        value: Chris
       - name: LOCAL_AGENT_AGENT_EXECUTION_ENABLED
         value: "true"
       - name: LOCAL_AGENT_DESKTOP_ISOLATION_ENABLED
@@ -126,11 +128,8 @@ services:
         mountPath: /app/data
         storageClassName: synology-nfs
       - name: shared-auth
-        claimName: shared-auth-nfs
-        size: 1Gi
+        existingClaim: shared-auth-nfs
         mountPath: /shared-auth
-        accessMode: ReadWriteMany
-        storageClassName: synology-nfs
     probes:
       readiness:
         httpGet:

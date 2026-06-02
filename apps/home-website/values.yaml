@@ -24,17 +24,17 @@ services:
       - name: PORT
         value: "8080"
       - name: MODEL_RAILROAD_URL
-        value: http://modelrailroadautomation.lan/
+        value: http://projects.lan/railroad-automation/
       - name: TRADING_BOT_URL
-        value: http://modeltradingbot.lan/
+        value: http://projects.lan/model-trading-bot/
       - name: TRADING_BOT_PLATFORM_URL
-        value: http://tradingbot.lan/
+        value: http://projects.lan/trading-bot/
       - name: LOCAL_LLM_URL
-        value: http://localllm.lan/
+        value: http://projects.lan/local-llm/
       - name: LOCAL_AGENT_URL
-        value: http://localagent.lan/
+        value: http://projects.lan/local-agent/
       - name: RECRUITING_APP_URL
-        value: http://recruitingapp.lan/
+        value: http://projects.lan/recruiting-app/
       - name: PIHOLE_URL
         value: http://pihole.lan/
       - name: HOMEBRIDGE_URL
@@ -82,6 +82,17 @@ services:
         value: http://home-assistant-server.default.svc.cluster.local:8123/
       - name: K8S_MANAGEMENT_HEALTH_URL
         value: http://k8s-management-ui-web.default.svc.cluster.local/api/health
+      - name: SHARED_AUTH_DB
+        value: /shared-auth/auth.db
+      - name: PROJECTS_LAN_COOKIE_NAME
+        value: projects_lan_session
+      - name: SESSION_COOKIE_SECURE
+        value: "false"
+
+    persistence:
+      - name: shared-auth
+        existingClaim: shared-auth-nfs
+        mountPath: /shared-auth
 
     resources:
       requests:

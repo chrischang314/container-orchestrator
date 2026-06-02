@@ -35,6 +35,8 @@ services:
         value: http://host.lima.internal:11434
       - name: SHARED_AUTH_DB
         value: /shared-auth/auth.db
+      - name: CORS_ORIGINS
+        value: http://localllm.lan,http://projects.lan,http://localhost:12000,http://127.0.0.1:12000,http://localhost:3000,http://127.0.0.1:3000
 
     resources:
       requests:

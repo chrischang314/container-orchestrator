@@ -67,6 +67,7 @@ services: []
 #         storageClassName: synology-nfs   # primary backend storage
 #         claimName: ""                    # optional PVC name override for migrations
 #         existingClaim: ""                # optional pre-created PVC; skips PVC creation
+#         keep: false                      # optional: add Helm keep annotation on created PVC
 
 # Optional additional Services that point at an existing component Deployment.
 # Useful when one pod needs separate Service types, such as a DNS LoadBalancer
