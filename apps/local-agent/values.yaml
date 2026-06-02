@@ -21,7 +21,7 @@ services:
     serviceName: local-agent-backend
     image: ghcr.io/chrischang314/local-agent/backend
     tag: main
-    digest: "sha256:16f27518d970ef13d109b156b632259af7300116dcd405b3f44bd8c84ec31116"
+    digest: "sha256:23813b50e29fc81ef0c9a690f46bc3911b67a5c68da113417074cb9ad05a5189"
     autoDeploy:
       enabled: false
     port: 8000
@@ -83,6 +83,20 @@ services:
             name: local-agent-external-model-endpoints
             key: MODEL_ENDPOINTS
             optional: true
+      - name: LOCAL_AGENT_WEB_SEARCH_PROVIDER
+        value: auto
+      - name: LOCAL_AGENT_BRAVE_SEARCH_API_KEY
+        valueFrom:
+          secretKeyRef:
+            name: local-agent-web-search
+            key: brave-search-api-key
+            optional: true
+      - name: LOCAL_AGENT_FIRECRAWL_API_KEY
+        valueFrom:
+          secretKeyRef:
+            name: local-agent-web-search
+            key: firecrawl-api-key
+            optional: true
       - name: LOCAL_AGENT_CLOUD_FALLBACK_ENABLED
         value: "false"
       - name: LOCAL_AGENT_ADMIN_TOKEN
@@ -140,7 +154,7 @@ services:
     serviceName: local-agent-frontend
     image: ghcr.io/chrischang314/local-agent/frontend
     tag: main
-    digest: "sha256:c01a76a7078b7b52ecfabbc73a53f38dc0162ce35a199860dafc990251d7e285"
+    digest: "sha256:2d002c133530e2d2c54d2cdda2401b54e31aef85f15480377559ca829929149c"
     autoDeploy:
       enabled: false
     serviceType: LoadBalancer
@@ -178,7 +192,7 @@ services:
     serviceName: local-agent-worker
     image: ghcr.io/chrischang314/local-agent/worker
     tag: main
-    digest: "sha256:f81a495edad77b87f2c35fc7a7b53ae41c6e957e3430e8e595a764d17773a1e0"
+    digest: "sha256:c9665e4dc1df66ca91dc14d14970b97a6bcfd0d1fdb1ca4644edceffb190417f"
     autoDeploy:
       enabled: false
     port: 8080
@@ -208,6 +222,20 @@ services:
         value: "true"
       - name: LOCAL_AGENT_WORKER_WEB_ENABLED
         value: "true"
+      - name: LOCAL_AGENT_WEB_SEARCH_PROVIDER
+        value: auto
+      - name: LOCAL_AGENT_BRAVE_SEARCH_API_KEY
+        valueFrom:
+          secretKeyRef:
+            name: local-agent-web-search
+            key: brave-search-api-key
+            optional: true
+      - name: LOCAL_AGENT_FIRECRAWL_API_KEY
+        valueFrom:
+          secretKeyRef:
+            name: local-agent-web-search
+            key: firecrawl-api-key
+            optional: true
       - name: LOCAL_AGENT_WORKER_PORT
         value: "8080"
       - name: LOCAL_AGENT_WORKER_AUTH_TOKEN
