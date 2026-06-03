@@ -3,10 +3,14 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
+  buildCapacitySnapshot,
   demoRawCluster,
   mapClusterSnapshot,
+  memorySeverity,
   parseCpuMillis,
   parseMemoryBytes,
+  parseCpuToMillicores,
+  parseMemoryToBytes,
   shouldUseDemoMode
 } = require("../src/kubernetes");
 
@@ -46,9 +50,11 @@ test("quantity parsers handle Kubernetes CPU and memory suffixes", () => {
   assert.equal(parseCpuMillis("250m"), 250);
   assert.equal(parseCpuMillis("2"), 2000);
   assert.equal(parseCpuMillis("125000000n"), 125);
+  assert.equal(parseCpuToMillicores("250u"), 0.25);
   assert.equal(parseMemoryBytes("512Mi"), 536870912);
   assert.equal(parseMemoryBytes("2Gi"), 2147483648);
   assert.equal(parseMemoryBytes("1000"), 1000);
+  assert.equal(parseMemoryToBytes("1000K"), 1000 * 1000);
 });
 
 test("mapClusterSnapshot computes node pressure and sorted top pods", () => {
@@ -92,6 +98,28 @@ test("mapClusterSnapshot keeps cluster snapshot available when metrics are missi
   assert.equal(snapshot.capacity.available, false);
   assert.equal(snapshot.capacity.message, "Metrics API unavailable.");
   assert.deepEqual(snapshot.capacity.topPods, []);
+});
+
+test("buildCapacitySnapshot accepts branch metrics shape", () => {
+  const raw = demoRawCluster();
+  const snapshot = buildCapacitySnapshot({
+    ...raw,
+    metrics: {
+      nodes: raw.metricsApi.nodes,
+      pods: raw.metricsApi.pods
+    }
+  }, raw.pods.items);
+
+  assert.equal(snapshot.available, true);
+  assert.equal(snapshot.nodes.length, 2);
+  assert.equal(snapshot.topPods[0].nodeName, "mac-mini-worker");
+});
+
+test("memorySeverity classifies node pressure thresholds", () => {
+  assert.equal(memorySeverity(69.9), "normal");
+  assert.equal(memorySeverity(70), "elevated");
+  assert.equal(memorySeverity(85), "high");
+  assert.equal(memorySeverity(null), "unknown");
 });
 
 test("mapClusterSnapshot marks offline nodes", () => {

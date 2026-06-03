@@ -158,14 +158,40 @@ function publicClusterSnapshot(snapshot) {
       workloads: readyDeployments === rawDeployments.length ? "healthy" : "attention"
     },
     nodes,
-    capacity: publicCapacitySnapshot(snapshot.capacity),
     externalWorkers: rawExternalWorkers.map((worker) => ({
       name: worker.name,
       online: Boolean(worker.online),
       desiredState: worker.desiredState,
       actualState: worker.actualState
     })),
-    namespaces: namespaceRows
+    namespaces: namespaceRows,
+    capacity: publicCapacitySnapshot(snapshot.capacity)
+  };
+}
+
+function publicCapacitySnapshot(capacity = {}) {
+  const nodes = capacity.nodes || [];
+  return {
+    available: Boolean(capacity.available),
+    source: capacity.source,
+    message: capacity.available ? capacity.message : "Metrics API unavailable.",
+    reason: capacity.available ? "" : capacity.reason || capacity.message || "Metrics API unavailable.",
+    nodePressure: nodes.map((node) => ({
+      name: node.name,
+      cpuPercentUsed: node.cpu?.percentUsed ?? null,
+      memoryPercentUsed: node.memory?.percentUsed ?? null,
+      memorySeverity: node.memory?.severity || node.severity || "unknown"
+    })),
+    summary: {
+      normalNodes: nodes.filter((node) => (node.memory?.severity || node.severity) === "normal").length,
+      elevatedNodes: nodes.filter((node) => (node.memory?.severity || node.severity) === "elevated").length,
+      highNodes: nodes.filter((node) => (node.memory?.severity || node.severity) === "high").length,
+      nodeCount: Number(capacity.summary?.nodeCount || nodes.length),
+      topPodCount: Number(capacity.summary?.topPodCount || 0),
+      elevatedMemoryNodes: Number(capacity.summary?.elevatedMemoryNodes || 0),
+      highMemoryNodes: Number(capacity.summary?.highMemoryNodes || 0),
+      maxMemoryPercent: capacity.summary?.maxMemoryPercent ?? null
+    }
   };
 }
 
@@ -181,22 +207,6 @@ function publicNodeCapacity(capacity) {
       percentUsed: capacity.memory?.percentUsed ?? null
     },
     severity: capacity.severity || "unknown"
-  };
-}
-
-function publicCapacitySnapshot(capacity) {
-  if (!capacity) return undefined;
-  return {
-    available: Boolean(capacity.available),
-    source: capacity.source,
-    message: capacity.available ? capacity.message : "Metrics API unavailable.",
-    summary: {
-      nodeCount: Number(capacity.summary?.nodeCount || 0),
-      topPodCount: Number(capacity.summary?.topPodCount || 0),
-      elevatedMemoryNodes: Number(capacity.summary?.elevatedMemoryNodes || 0),
-      highMemoryNodes: Number(capacity.summary?.highMemoryNodes || 0),
-      maxMemoryPercent: capacity.summary?.maxMemoryPercent ?? null
-    }
   };
 }
 
@@ -295,6 +305,7 @@ if (require.main === module) {
 
 module.exports = {
   createServer,
+  publicCapacitySnapshot,
   publicClusterSnapshot,
   requireMutationConfirmation,
   readJson

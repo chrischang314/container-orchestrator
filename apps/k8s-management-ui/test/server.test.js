@@ -208,6 +208,10 @@ test("public status mode serves sanitized cluster data and blocks controls", asy
     assert.equal(cluster.capacity.topPods, undefined);
     assert.equal(cluster.nodes[0].capacity.memory.percentUsed, 73.5);
     assert.equal(cluster.externalWorkers[0].name, "chris-pc-2");
+    assert.equal(cluster.capacity.available, true);
+    assert.equal(cluster.capacity.nodePressure.length, 2);
+    assert.equal(cluster.capacity.summary.elevatedNodes, 1);
+    assert.equal(cluster.capacity.topPods, undefined);
     assert.equal(cluster.nodes[0].containers, undefined);
     assert.equal(cluster.containers, undefined);
     assert.equal(JSON.stringify(cluster).includes("pihole-6f9fb77c8d-n2z7x"), false);

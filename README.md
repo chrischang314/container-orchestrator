@@ -314,3 +314,10 @@ The LAN `k8s-management-ui` requires an explicit confirmation step for
 mutating cluster actions and typed mutating `kubectl` commands. The backend
 also rejects unconfirmed mutations, so the dialog is an operator-safety layer on
 top of server-side enforcement.
+
+The same UI also exposes a read-only capacity panel from the Kubernetes Metrics
+API. `GET /api/cluster` includes node CPU and memory pressure plus top memory
+pods when `metrics.k8s.io` is available, and falls back to
+`capacity.available=false` without breaking the rest of the snapshot when
+metrics are unavailable. The public `k8s-cluster-status` deployment receives
+only sanitized node-pressure aggregates, not detailed pod names.

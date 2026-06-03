@@ -328,3 +328,12 @@ mutating actions or typed mutating `kubectl` commands send a network request.
 The backend also rejects unconfirmed mutating `/api/action` and `/api/command`
 calls with HTTP 409, while read-only controls stay one-click. Receipts show the
 exact command, mutating/read-only classification, exit code, stdout, and stderr.
+
+## K8s UI Capacity Panel
+
+`GET /api/cluster` now includes a read-only `capacity` object from
+`metrics.k8s.io` with node CPU/memory pressure and the top memory-consuming
+pods. If the Metrics API or RBAC is unavailable, the endpoint still succeeds
+with `capacity.available=false`. The LAN UI renders the detailed top-pod list;
+the public `k8s-cluster-status` mode exposes only node-pressure aggregates.
+Both service accounts need read-only `metrics.k8s.io` access for nodes and pods.

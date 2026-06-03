@@ -108,6 +108,8 @@ function capacitySeverity(memoryPercent) {
   return "normal";
 }
 
+const memorySeverity = capacitySeverity;
+
 function formatCpuMillis(value) {
   if (!Number.isFinite(value)) return "";
   if (value >= 1000) return `${roundMetric(value / 1000, 2)} cores`;
@@ -251,6 +253,22 @@ function mapCapacity(raw, podNodeNames = new Map()) {
       maxMemoryPercent: memoryPercents.length ? Math.max(...memoryPercents) : null
     }
   };
+}
+
+function buildCapacitySnapshot(raw, podItems = raw.pods?.items || []) {
+  const podNodeNames = new Map((podItems || []).map((pod) => [
+    `${pod.metadata?.namespace || "default"}/${pod.metadata?.name || ""}`,
+    pod.spec?.nodeName || ""
+  ]));
+  if (raw.metrics && !raw.metricsApi) {
+    raw = {
+      ...raw,
+      metricsApi: raw.metrics.error
+        ? { nodes: null, pods: null, errors: [raw.metrics.error] }
+        : { nodes: raw.metrics.nodes, pods: raw.metrics.pods, errors: [] }
+    };
+  }
+  return mapCapacity(raw, podNodeNames);
 }
 
 function mapClusterSnapshot(raw, now = new Date()) {
@@ -547,7 +565,7 @@ function demoRawCluster() {
       nodes: {
         items: [
           nodeMetric("rpi5-control", "512m", "5320Mi"),
-          nodeMetric("mac-mini-worker", "2200m", "10920Mi")
+          nodeMetric("mac-mini-worker", "2200m", "9800Mi")
         ]
       },
       pods: {
@@ -644,6 +662,7 @@ function externalWorkerDeployment(namespace, name, worker, replicas, readyReplic
 }
 
 module.exports = {
+  buildCapacitySnapshot,
   capacitySeverity,
   createKubernetesClient,
   demoRawCluster,
@@ -652,5 +671,8 @@ module.exports = {
   mapClusterSnapshot,
   parseCpuMillis,
   parseMemoryBytes,
+  memorySeverity,
+  parseCpuToMillicores: parseCpuMillis,
+  parseMemoryToBytes: parseMemoryBytes,
   shouldUseDemoMode
 };
