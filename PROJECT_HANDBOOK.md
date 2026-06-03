@@ -21,11 +21,20 @@ allowlisted `kubectl` controls.
   is available. It reports node CPU/memory pressure and top memory-consuming
   pods; if `metrics.k8s.io` is unavailable or denied, the API still returns the
   rest of the cluster snapshot with `capacity.available=false`.
+- `/api/cluster` includes a read-only `storage` object when PVC access is
+  available. It inventories PVCs, joins PV and StorageClass metadata when RBAC
+  allows it, infers consuming workloads from pod volume mounts, and labels
+  local-path or node-local storage as high risk. Pending, lost, unbound, or
+  partially inventoried claims stay visible as attention items instead of
+  failing the whole cluster snapshot.
 - The public `k8s-cluster-status` deployment may show node-level capacity
   summaries, but it must not expose detailed top-pod names.
 - Public status treats deployments scaled to `0` replicas as inactive instead
   of unhealthy, which avoids false attention for dormant worker switches and
   sandbox placeholders.
+- The public `k8s-cluster-status` deployment may show aggregate storage counts,
+  but it must not expose PVC names, PV names, or workload-specific storage
+  details.
 - Read-only commands and status actions run directly.
 - Mutating built-in actions and typed mutating commands open a confirmation
   dialog before any network request is sent.

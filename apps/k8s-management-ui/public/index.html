@@ -54,6 +54,39 @@
           </article>
         </section>
 
+        <section class="capacity-grid" aria-label="Storage readiness">
+          <article class="capacity-panel">
+            <div class="section-heading">
+              <h2>Storage Readiness</h2>
+              <span id="storageStatus">inventory pending</span>
+            </div>
+            <div class="storage-summary" id="storageSummary"></div>
+          </article>
+
+          <article class="capacity-panel">
+            <div class="section-heading">
+              <h2>PVC Risk</h2>
+              <span>read-only</span>
+            </div>
+            <div class="table-wrap">
+              <table class="storage-table">
+                <thead>
+                  <tr>
+                    <th>Namespace</th>
+                    <th>Claim</th>
+                    <th>Workload</th>
+                    <th>Class</th>
+                    <th>Size</th>
+                    <th>Status</th>
+                    <th>Risk</th>
+                  </tr>
+                </thead>
+                <tbody id="storageRows"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
         <section class="workspace">
           <div class="topology-panel">
             <div class="section-heading">

@@ -249,6 +249,30 @@ h2 {
   gap: 10px;
 }
 
+.storage-summary {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.storage-summary-item {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 12px;
+}
+
+.storage-summary-item span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
 .node-card,
 .external-worker-card,
 .capacity-node-row {
@@ -385,6 +409,16 @@ table {
 .capacity-table {
   min-width: 0;
   table-layout: fixed;
+}
+
+.storage-table {
+  min-width: 820px;
+}
+
+.storage-table td:nth-child(2),
+.storage-table td:nth-child(3),
+.storage-table td:nth-child(4) {
+  overflow-wrap: anywhere;
 }
 
 .capacity-table th:nth-child(1),
@@ -553,6 +587,10 @@ pre {
 
   .command-form {
     grid-template-columns: 1fr;
+  }
+
+  .storage-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   h1 {

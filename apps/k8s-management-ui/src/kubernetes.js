@@ -9,6 +9,9 @@ const EXTERNAL_WORKER_COMPONENT = "external-worker-switch";
 const TOP_PODS_LIMIT = 8;
 const MEMORY_ELEVATED_PERCENT = 70;
 const MEMORY_HIGH_PERCENT = 85;
+const LOCAL_STORAGE_HINTS = ["local-path", "hostpath", "node-local"];
+const LOCAL_STORAGE_PROVISIONERS = ["rancher.io/local-path", "kubernetes.io/no-provisioner"];
+const NETWORK_STORAGE_HINTS = ["nfs", "synology", "longhorn", "ceph", "cinder", "efs", "azure", "gce", "gluster"];
 const MEMORY_FACTORS = new Map([
   ["Ki", 1024],
   ["Mi", 1024 ** 2],
@@ -151,6 +154,230 @@ function unavailableCapacity(metricsApi = {}) {
       maxMemoryPercent: null
     }
   };
+}
+
+function storageErrors(storageApi = {}) {
+  return (storageApi.errors || []).filter(Boolean);
+}
+
+function unavailableStorage(storageApi = {}) {
+  const errors = storageErrors(storageApi);
+  return {
+    available: false,
+    partial: false,
+    source: "api/v1 persistentvolumeclaims",
+    message: errors.length ? "Storage inventory unavailable." : "No PVC inventory returned by the Kubernetes API.",
+    errors,
+    claims: [],
+    namespaces: [],
+    summary: emptyStorageSummary()
+  };
+}
+
+function emptyStorageSummary() {
+  return {
+    pvcCount: 0,
+    bound: 0,
+    pending: 0,
+    lost: 0,
+    highRisk: 0,
+    attention: 0,
+    localPath: 0,
+    network: 0,
+    unknownStorage: 0,
+    namespaces: 0,
+    storageClasses: 0
+  };
+}
+
+function mapStorageReadiness(raw, podItems = [], deploymentItems = []) {
+  const storageApi = raw.storageApi || {};
+  const pvcItems = storageApi.claims?.items || raw.persistentVolumeClaims?.items || [];
+  if (!pvcItems.length && storageApi.claimsUnavailable) return unavailableStorage(storageApi);
+  if (!pvcItems.length && !storageApi.claims && !raw.persistentVolumeClaims) return unavailableStorage(storageApi);
+
+  const errors = storageErrors(storageApi);
+  const pvItems = storageApi.volumes?.items || raw.persistentVolumes?.items || [];
+  const storageClassItems = storageApi.classes?.items || raw.storageClasses?.items || [];
+  const volumes = new Map(pvItems.map((item) => [item.metadata?.name || "", item]));
+  const storageClasses = new Map(storageClassItems.map((item) => [item.metadata?.name || "", item]));
+  const consumers = pvcConsumers(podItems, deploymentItems);
+
+  const claims = pvcItems.map((pvc) => {
+    const namespace = pvc.metadata?.namespace || "default";
+    const name = pvc.metadata?.name || "";
+    const status = pvc.status?.phase || "Unknown";
+    const storageClass = pvcStorageClassName(pvc);
+    const volumeName = pvc.spec?.volumeName || "";
+    const volume = volumes.get(volumeName);
+    const effectiveStorageClass = storageClass || volume?.spec?.storageClassName || "";
+    const classObject = storageClasses.get(effectiveStorageClass);
+    const storageType = classifyStorageType(effectiveStorageClass, classObject, volume);
+    const risk = storageRisk(pvc, volume, classObject, storageType, {
+      volumesAvailable: Boolean(storageApi.volumes || raw.persistentVolumes),
+      storageClassesAvailable: Boolean(storageApi.classes || raw.storageClasses)
+    });
+    const ownerWorkloads = Array.from(consumers.get(`${namespace}/${name}`) || []).sort((left, right) =>
+      left.localeCompare(right)
+    );
+
+    return {
+      namespace,
+      name,
+      status,
+      storageClass: effectiveStorageClass,
+      requested: pvc.spec?.resources?.requests?.storage || "",
+      accessModes: pvc.spec?.accessModes || [],
+      volumeName,
+      ownerWorkloads,
+      storageType,
+      risk: risk.level,
+      riskReasons: risk.reasons
+    };
+  }).sort((left, right) =>
+    left.namespace.localeCompare(right.namespace) ||
+    (left.ownerWorkloads[0] || "").localeCompare(right.ownerWorkloads[0] || "") ||
+    left.name.localeCompare(right.name)
+  );
+
+  const namespaceSummary = new Map();
+  const classNames = new Set();
+  for (const claim of claims) {
+    if (claim.storageClass) classNames.add(claim.storageClass);
+    const item = ensureStorageNamespace(namespaceSummary, claim.namespace);
+    item.pvcCount += 1;
+    if (claim.status === "Bound") item.bound += 1;
+    if (claim.status === "Pending") item.pending += 1;
+    if (claim.status === "Lost") item.lost += 1;
+    if (claim.risk === "high") item.highRisk += 1;
+    if (claim.risk !== "normal") item.attention += 1;
+  }
+
+  const namespaces = Array.from(namespaceSummary.values()).sort((left, right) =>
+    left.namespace.localeCompare(right.namespace)
+  );
+
+  return {
+    available: true,
+    partial: errors.length > 0,
+    source: "api/v1 persistentvolumeclaims",
+    message: errors.length ? "Storage inventory partially available." : "Storage inventory available.",
+    errors,
+    claims,
+    namespaces,
+    summary: {
+      pvcCount: claims.length,
+      bound: claims.filter((claim) => claim.status === "Bound").length,
+      pending: claims.filter((claim) => claim.status === "Pending").length,
+      lost: claims.filter((claim) => claim.status === "Lost").length,
+      highRisk: claims.filter((claim) => claim.risk === "high").length,
+      attention: claims.filter((claim) => claim.risk !== "normal").length,
+      localPath: claims.filter((claim) => claim.storageType === "local").length,
+      network: claims.filter((claim) => claim.storageType === "network").length,
+      unknownStorage: claims.filter((claim) => claim.storageType === "unknown").length,
+      namespaces: namespaces.length,
+      storageClasses: classNames.size
+    }
+  };
+}
+
+function ensureStorageNamespace(namespaces, namespace) {
+  if (!namespaces.has(namespace)) {
+    namespaces.set(namespace, {
+      namespace,
+      pvcCount: 0,
+      bound: 0,
+      pending: 0,
+      lost: 0,
+      highRisk: 0,
+      attention: 0
+    });
+  }
+  return namespaces.get(namespace);
+}
+
+function pvcStorageClassName(pvc) {
+  return pvc.spec?.storageClassName || pvc.metadata?.annotations?.["volume.beta.kubernetes.io/storage-class"] || "";
+}
+
+function pvcConsumers(podItems = [], deploymentItems = []) {
+  const deploymentsByNamespace = new Map();
+  for (const deployment of deploymentItems) {
+    const namespace = deployment.metadata?.namespace || "default";
+    if (!deploymentsByNamespace.has(namespace)) deploymentsByNamespace.set(namespace, []);
+    deploymentsByNamespace.get(namespace).push(deployment.metadata?.name || "");
+  }
+  for (const names of deploymentsByNamespace.values()) {
+    names.sort((left, right) => right.length - left.length);
+  }
+
+  const consumers = new Map();
+  for (const pod of podItems) {
+    const namespace = pod.metadata?.namespace || "default";
+    const workload = podWorkloadName(pod, deploymentsByNamespace.get(namespace) || []);
+    for (const volume of pod.spec?.volumes || []) {
+      const claimName = volume.persistentVolumeClaim?.claimName;
+      if (!claimName) continue;
+      const key = `${namespace}/${claimName}`;
+      if (!consumers.has(key)) consumers.set(key, new Set());
+      consumers.get(key).add(workload);
+    }
+  }
+  return consumers;
+}
+
+function podWorkloadName(pod, deploymentNames = []) {
+  const owner = (pod.metadata?.ownerReferences || []).find((item) => item.controller) ||
+    (pod.metadata?.ownerReferences || [])[0];
+  if (!owner?.kind || !owner?.name) return `Pod/${pod.metadata?.name || ""}`;
+  if (owner.kind === "ReplicaSet") {
+    const deployment = deploymentNames.find((name) => owner.name === name || owner.name.startsWith(`${name}-`));
+    return deployment ? `Deployment/${deployment}` : `ReplicaSet/${owner.name}`;
+  }
+  return `${owner.kind}/${owner.name}`;
+}
+
+function classifyStorageType(storageClassName, storageClass, volume) {
+  const provisioner = String(storageClass?.provisioner || "").toLowerCase();
+  const className = String(storageClassName || "").toLowerCase();
+  const volumeSpec = volume?.spec || {};
+  const volumeText = JSON.stringify(volumeSpec).toLowerCase();
+  if (
+    LOCAL_STORAGE_HINTS.some((hint) => className.includes(hint) || volumeText.includes(hint)) ||
+    LOCAL_STORAGE_PROVISIONERS.some((hint) => provisioner.includes(hint)) ||
+    volumeSpec.local ||
+    volumeSpec.hostPath ||
+    volumeSpec.nodeAffinity
+  ) {
+    return "local";
+  }
+  if (
+    NETWORK_STORAGE_HINTS.some((hint) => className.includes(hint) || provisioner.includes(hint) || volumeText.includes(hint)) ||
+    volumeSpec.nfs
+  ) {
+    return "network";
+  }
+  return "unknown";
+}
+
+function storageRisk(pvc, volume, storageClass, storageType, availability = {}) {
+  const status = pvc.status?.phase || "Unknown";
+  const reasons = [];
+
+  if (status === "Lost") reasons.push("PVC is lost.");
+  if (status === "Pending") reasons.push("PVC is pending.");
+  if (status !== "Bound") reasons.push("PVC is not bound.");
+  if (!pvc.spec?.volumeName) reasons.push("No bound PV is recorded.");
+  if (storageType === "local") reasons.push("Storage appears node-local.");
+  if (storageType === "unknown") reasons.push("Storage type is unknown.");
+  if (storageType === "unknown" && !storageClass) reasons.push("StorageClass details are unavailable.");
+  if (availability.volumesAvailable && pvc.spec?.volumeName && !volume) reasons.push("Bound PV was not found.");
+  if (!availability.volumesAvailable) reasons.push("PV inventory is unavailable.");
+  if (!availability.storageClassesAvailable) reasons.push("StorageClass inventory is unavailable.");
+
+  if (status === "Lost" || storageType === "local") return { level: "high", reasons };
+  if (reasons.length) return { level: "attention", reasons };
+  return { level: "normal", reasons: ["Network or non-local storage detected."] };
 }
 
 function mapCapacity(raw, podNodeNames = new Map()) {
@@ -396,7 +623,8 @@ function mapClusterSnapshot(raw, now = new Date()) {
     externalWorkers,
     deployments,
     containers,
-    capacity: mapCapacity(raw, podNodeNames)
+    capacity: mapCapacity(raw, podNodeNames),
+    storage: mapStorageReadiness(raw, podItems, deploymentItems)
   };
 }
 
@@ -429,12 +657,15 @@ function createKubernetesClient(options = {}) {
   return {
     mode: "cluster",
     async snapshot() {
-      const [nodes, pods, deployments, nodeMetrics, podMetrics] = await Promise.all([
+      const [nodes, pods, deployments, nodeMetrics, podMetrics, persistentVolumeClaims, persistentVolumes, storageClasses] = await Promise.all([
         request("/api/v1/nodes"),
         request("/api/v1/pods"),
         request("/apis/apps/v1/deployments"),
         optionalRequest(request, "/apis/metrics.k8s.io/v1beta1/nodes"),
-        optionalRequest(request, "/apis/metrics.k8s.io/v1beta1/pods")
+        optionalRequest(request, "/apis/metrics.k8s.io/v1beta1/pods"),
+        optionalRequest(request, "/api/v1/persistentvolumeclaims"),
+        optionalRequest(request, "/api/v1/persistentvolumes"),
+        optionalRequest(request, "/apis/storage.k8s.io/v1/storageclasses")
       ]);
       return mapClusterSnapshot({
         nodes,
@@ -444,6 +675,13 @@ function createKubernetesClient(options = {}) {
           nodes: nodeMetrics.data,
           pods: podMetrics.data,
           errors: [nodeMetrics.error, podMetrics.error].filter(Boolean)
+        },
+        storageApi: {
+          claims: persistentVolumeClaims.data,
+          volumes: persistentVolumes.data,
+          classes: storageClasses.data,
+          claimsUnavailable: Boolean(persistentVolumeClaims.error),
+          errors: [persistentVolumeClaims.error, persistentVolumes.error, storageClasses.error].filter(Boolean)
         }
       }, new Date());
     }
@@ -548,7 +786,10 @@ function demoRawCluster() {
         ]),
         pod("default", "model-trading-bot-backend-8b9775d9bc-r5p7d", "mac-mini-worker", "Running", [
           ["backend", "ghcr.io/chrischang314/model-trading-bot/backend:main", true, 0, "running"]
-        ])
+        ], {
+          ownerReferences: [{ kind: "ReplicaSet", name: "model-trading-bot-backend-8b9775d9bc", controller: true }],
+          volumes: [{ name: "data", persistentVolumeClaim: { claimName: "model-trading-bot-backend-data" } }]
+        })
       ]
     },
     deployments: {
@@ -578,6 +819,40 @@ function demoRawCluster() {
         ]
       },
       errors: []
+    },
+    persistentVolumeClaims: {
+      items: [
+        pvc("default", "model-trading-bot-backend-data", "Bound", "local-path", "20Gi", ["ReadWriteOnce"], "pvc-local-model-trading"),
+        pvc("default", "postgres-postgres-pgdata", "Bound", "synology-nfs", "50Gi", ["ReadWriteOnce"], "pvc-nfs-postgres"),
+        pvc("recruiting-app", "recruiting-app-scraper-cache", "Pending", "local-path", "10Gi", ["ReadWriteOnce"], "")
+      ]
+    },
+    persistentVolumes: {
+      items: [
+        persistentVolume("pvc-local-model-trading", "local-path", "20Gi", {
+          local: { path: "/var/lib/rancher/k3s/storage/pvc-local-model-trading" },
+          nodeAffinity: {
+            required: {
+              nodeSelectorTerms: [{
+                matchExpressions: [{
+                  key: "kubernetes.io/hostname",
+                  operator: "In",
+                  values: ["mac-mini-worker"]
+                }]
+              }]
+            }
+          }
+        }),
+        persistentVolume("pvc-nfs-postgres", "synology-nfs", "50Gi", {
+          nfs: { server: "192.168.4.33", path: "/volume1/k8s/postgres" }
+        })
+      ]
+    },
+    storageClasses: {
+      items: [
+        storageClass("local-path", "rancher.io/local-path"),
+        storageClass("synology-nfs", "cluster.local/nfs-subdir-external-provisioner")
+      ]
     }
   };
 }
@@ -599,11 +874,48 @@ function podMetric(namespace, name, containers) {
   };
 }
 
-function pod(namespace, name, nodeName, phase, containers) {
+function pvc(namespace, name, phase, storageClassName, requested, accessModes, volumeName) {
   return {
     metadata: { namespace, name },
     spec: {
+      storageClassName,
+      resources: { requests: { storage: requested } },
+      accessModes,
+      volumeName
+    },
+    status: { phase }
+  };
+}
+
+function persistentVolume(name, storageClassName, capacity, sourceSpec) {
+  return {
+    metadata: { name },
+    spec: {
+      storageClassName,
+      capacity: { storage: capacity },
+      ...sourceSpec
+    },
+    status: { phase: "Bound" }
+  };
+}
+
+function storageClass(name, provisioner) {
+  return {
+    metadata: { name },
+    provisioner
+  };
+}
+
+function pod(namespace, name, nodeName, phase, containers, options = {}) {
+  return {
+    metadata: {
+      namespace,
+      name,
+      ...(options.ownerReferences ? { ownerReferences: options.ownerReferences } : {})
+    },
+    spec: {
       nodeName,
+      volumes: options.volumes || [],
       containers: containers.map(([containerName, image]) => ({ name: containerName, image }))
     },
     status: {
@@ -669,6 +981,7 @@ module.exports = {
   httpsJson,
   mapCapacity,
   mapClusterSnapshot,
+  mapStorageReadiness,
   parseCpuMillis,
   parseMemoryBytes,
   memorySeverity,

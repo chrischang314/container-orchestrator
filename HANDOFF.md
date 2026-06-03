@@ -89,8 +89,8 @@ kubectl exec deploy/pihole-pihole -- pihole-FTL --config dns.hosts
 | `home-website-public` | `ghcr.io/chrischang314/home-website:public` | `chriswchang.com` | `mac-mini-worker` | Public portfolio with TLS via `letsencrypt-http01`; also catches direct public-IP HTTP requests. |
 | `home-assistant` | `ghcr.io/home-assistant/home-assistant:stable` | `homeassistant.lan` | `rpi5-control` | Uses `hostNetwork: true` for discovery/integrations. Config path is `/srv/home-assistant` on the Pi. |
 | `homebridge` | `homebridge/homebridge:latest` | `homebridge.lan` | `rpi5-control` | Uses `hostNetwork: true` for HomeKit/mDNS reliability. Config path is `/srv/homebridge` on the Pi. |
-| `k8s-management-ui` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | `k8s.lan` | `rpi5-control` | LAN control panel for nodes, containers, deployments, read-only Metrics API capacity pressure, and allowlisted kubectl controls. Mutating controls require UI confirmation and backend `confirmed: true` before execution; cluster-scoped RBAC remains the enforcement layer. |
-| `k8s-cluster-status` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | internal only | `rpi5-control` | Read-only public-status service for the portfolio `/cluster-status/` proxy. Uses read-only RBAC and sanitized aggregate output; capacity summaries omit detailed pod names. Deployments scaled to `0` are inactive, not unhealthy. |
+| `k8s-management-ui` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | `k8s.lan` | `rpi5-control` | LAN control panel for nodes, containers, deployments, read-only Metrics API capacity pressure, read-only PVC/PV/StorageClass readiness, and allowlisted kubectl controls. Mutating controls require UI confirmation and backend `confirmed: true` before execution; cluster-scoped RBAC remains the enforcement layer. |
+| `k8s-cluster-status` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | internal only | `rpi5-control` | Read-only public-status service for the portfolio `/cluster-status/` proxy. Uses read-only RBAC and sanitized aggregate output; capacity summaries omit detailed pod names, deployments scaled to `0` are inactive, and storage summaries omit PVC/PV/workload names. |
 | `local-agent` | `ghcr.io/chrischang314/local-agent/backend:main`, `frontend:main` | `localagent.lan` | `mac-mini-worker` | Backend and frontend are deployed with execution disabled. Worker replicas stay at 0 until a `worker:main` image exists and execution is intentionally enabled. Backend readiness checks `/api/health/ready` with an extended timeout for dependency checks that touch Synology NFS; liveness is a tolerant TCP check to avoid restarts during short NFS or app stalls. The backend uses `strategy.type: Recreate` because the Mac Mini worker cannot reliably fit a second backend pod during a rolling-update surge. |
 | `local-llm` | `ghcr.io/chrischang314/local-llm/*:main` | `localllm.lan` | `mac-mini-worker` | Backend reaches Ollama on the Mac host through `host.lima.internal:11434`, aliasing to `192.168.5.2`. |
 | `model-railroad-automation` | `ghcr.io/chrischang314/model-railroad-automation/web-control:main` | `modelrailroadautomation.lan` | `railroad-pi3` | Train web server; talks to DCC-EX at `192.168.4.22:2560`. |
@@ -320,6 +320,16 @@ curl.exe -I http://projects.lan/cluster-status/
 ## Agent Operating Policy
 
 Project-specific Codex rules now live in `AGENTS.md`. Use them before adding worker nodes or deploying containers. The important rule is simple: after any deployment, verify Helm lint, rollout status, pod health/logs when needed, and the LAN or health endpoint before calling the work complete.
+
+## K8s UI Storage Readiness
+
+`k8s.lan` inventories persistent volume claims through read-only Kubernetes API
+calls. When RBAC allows it, `/api/cluster` joins PVCs to PVs, StorageClasses,
+and pod volume consumers so operators can see which claims are node-local,
+pending, lost, unbound, or only partially inventoried before restarting,
+draining, or moving workloads. If PV or StorageClass reads fail, the endpoint
+still returns the rest of the cluster snapshot and marks `storage.partial=true`.
+The public `k8s-cluster-status` service exposes only aggregate storage counts.
 
 ## K8s UI Mutation Safety
 

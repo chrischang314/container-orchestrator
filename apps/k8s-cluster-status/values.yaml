@@ -14,13 +14,16 @@ rbac:
   clusterRoleName: k8s-cluster-status
   rules:
     - apiGroups: [""]
-      resources: ["nodes", "nodes/status", "namespaces", "pods", "services", "endpoints", "events"]
+      resources: ["nodes", "nodes/status", "namespaces", "pods", "services", "endpoints", "events", "persistentvolumeclaims", "persistentvolumes"]
       verbs: ["get", "list", "watch"]
     - apiGroups: ["apps"]
       resources: ["deployments", "replicasets", "daemonsets", "statefulsets"]
       verbs: ["get", "list", "watch"]
     - apiGroups: ["metrics.k8s.io"]
       resources: ["nodes", "pods"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: ["storage.k8s.io"]
+      resources: ["storageclasses"]
       verbs: ["get", "list", "watch"]
 
 services:

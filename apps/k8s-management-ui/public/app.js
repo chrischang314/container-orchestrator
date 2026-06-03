@@ -13,6 +13,9 @@ const els = {
   capacityStatus: document.getElementById("capacityStatus"),
   capacityNodeList: document.getElementById("capacityNodeList"),
   topPodRows: document.getElementById("topPodRows"),
+  storageStatus: document.getElementById("storageStatus"),
+  storageSummary: document.getElementById("storageSummary"),
+  storageRows: document.getElementById("storageRows"),
   nodeMap: document.getElementById("nodeMap"),
   lastUpdated: document.getElementById("lastUpdated"),
   selectedNodeLabel: document.getElementById("selectedNodeLabel"),
@@ -56,6 +59,7 @@ function render() {
   if (!state.snapshot) return;
   renderSummary();
   renderCapacity();
+  renderStorage();
   renderNodes();
   renderContainers();
   renderDeployments();
@@ -163,6 +167,81 @@ function severityClass(severity) {
   if (severity === "high") return "blocked";
   if (severity === "elevated") return "pending";
   if (severity === "normal") return "ready";
+  return "paused";
+}
+
+function renderStorage() {
+  const storage = state.snapshot.storage;
+  if (!storage) {
+    els.storageStatus.textContent = "storage unavailable";
+    els.storageStatus.className = "status-pill pending";
+    els.storageSummary.innerHTML = `<div class="empty-state">No storage inventory available</div>`;
+    els.storageRows.innerHTML = `<tr><td colspan="7" class="empty-state">No PVC inventory available</td></tr>`;
+    return;
+  }
+
+  const summary = storage.summary || {};
+  const statusClass = !storage.available
+    ? "pending"
+    : summary.highRisk > 0
+      ? "blocked"
+      : summary.attention > 0 || storage.partial
+        ? "pending"
+        : "ready";
+  els.storageStatus.textContent = storage.available
+    ? `${summary.pvcCount || 0} claims`
+    : "storage unavailable";
+  els.storageStatus.className = `status-pill ${statusClass}`;
+
+  const summaryRows = [
+    ["PVCs", summary.pvcCount || 0, "ready"],
+    ["High risk", summary.highRisk || 0, summary.highRisk > 0 ? "blocked" : "ready"],
+    ["Attention", summary.attention || 0, summary.attention > 0 ? "pending" : "ready"],
+    ["Local", summary.localPath || 0, summary.localPath > 0 ? "blocked" : "ready"],
+    ["Network", summary.network || 0, "ready"],
+    ["Unknown", summary.unknownStorage || 0, summary.unknownStorage > 0 ? "pending" : "ready"]
+  ];
+  els.storageSummary.innerHTML = summaryRows.map(([label, value, tone]) => `
+    <div class="storage-summary-item">
+      <span>${escapeHtml(label)}</span>
+      <strong class="status-pill ${tone}">${escapeHtml(value)}</strong>
+    </div>
+  `).join("");
+
+  const claims = storage.claims || [];
+  if (!storage.available) {
+    els.storageRows.innerHTML = `<tr><td colspan="7" class="empty-state">${escapeHtml(storage.message || "Storage inventory unavailable")}</td></tr>`;
+    return;
+  }
+  if (!claims.length) {
+    els.storageRows.innerHTML = `<tr><td colspan="7" class="empty-state">No persistent volume claims found</td></tr>`;
+    return;
+  }
+
+  els.storageRows.innerHTML = claims.map((claim) => {
+    const owner = (claim.ownerWorkloads || []).join(", ") || "unclaimed";
+    const riskClass = storageRiskClass(claim.risk);
+    const reasons = (claim.riskReasons || []).join(" ");
+    return `
+      <tr>
+        <td>${escapeHtml(claim.namespace)}</td>
+        <td>${escapeHtml(claim.name)}</td>
+        <td>${escapeHtml(owner)}</td>
+        <td>${escapeHtml(claim.storageClass || "--")}</td>
+        <td>${escapeHtml(claim.requested || "--")}</td>
+        <td><span class="status-pill ${claim.status === "Bound" ? "ready" : "pending"}">${escapeHtml(claim.status)}</span></td>
+        <td>
+          <span class="status-pill ${riskClass}" title="${escapeAttr(reasons)}">${escapeHtml(claim.risk || "unknown")}</span>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function storageRiskClass(risk) {
+  if (risk === "high") return "blocked";
+  if (risk === "attention") return "pending";
+  if (risk === "normal") return "ready";
   return "paused";
 }
 

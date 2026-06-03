@@ -38,6 +38,8 @@ test("server exposes health, cluster, and command endpoints", async () => {
     assert.equal(cluster.summary.nodes, 2);
     assert.equal(cluster.capacity.available, true);
     assert.equal(cluster.capacity.topPods.length > 0, true);
+    assert.equal(cluster.storage.available, true);
+    assert.equal(cluster.storage.claims.length, 3);
 
     const command = await postJson(`${base}/api/command`, { command: "kubectl get nodes" });
     assert.equal(command.ok, true);
@@ -206,6 +208,9 @@ test("public status mode serves sanitized cluster data and blocks controls", asy
     assert.equal(cluster.summary.externalWorkers, 1);
     assert.equal(cluster.capacity.available, true);
     assert.equal(cluster.capacity.topPods, undefined);
+    assert.equal(cluster.storage.available, true);
+    assert.equal(cluster.storage.summary.pvcCount, 3);
+    assert.equal(cluster.storage.claims, undefined);
     assert.equal(cluster.nodes[0].capacity.memory.percentUsed, 73.5);
     assert.equal(cluster.externalWorkers[0].name, "chris-pc-2");
     assert.equal(cluster.capacity.available, true);
@@ -216,6 +221,8 @@ test("public status mode serves sanitized cluster data and blocks controls", asy
     assert.equal(cluster.containers, undefined);
     assert.equal(JSON.stringify(cluster).includes("pihole-6f9fb77c8d-n2z7x"), false);
     assert.equal(JSON.stringify(cluster).includes("model-trading-bot-backend-8b9775d9bc-r5p7d"), false);
+    assert.equal(JSON.stringify(cluster).includes("model-trading-bot-backend-data"), false);
+    assert.equal(JSON.stringify(cluster).includes("pvc-local-model-trading"), false);
     assert.equal(JSON.stringify(cluster).includes("ghcr.io"), false);
 
     const html = await getText(`${base}/`);
