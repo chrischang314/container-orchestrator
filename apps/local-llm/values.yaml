@@ -37,6 +37,8 @@ services:
         value: /shared-auth/auth.db
       - name: CORS_ORIGINS
         value: http://localllm.lan,http://projects.lan,http://localhost:12000,http://127.0.0.1:12000,http://localhost:3000,http://127.0.0.1:3000
+      - name: KUBERNETES_NAMESPACE
+        value: local-llm
 
     resources:
       requests:
