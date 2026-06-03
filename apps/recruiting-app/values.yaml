@@ -148,6 +148,8 @@ services:
         value: "0"
       - name: SCRAPER_ENABLE_CRAWL
         value: "true"
+      - name: SCRAPER_ENABLE_JOB_CRAWL
+        value: "true"
       - name: SCRAPER_ENABLE_EMBED
         value: "true"
       - name: SCRAPER_ENABLE_OCR
@@ -158,6 +160,8 @@ services:
         value: "true"
       - name: SCRAPER_CRAWL_INTERVAL_HOURS
         value: "0.5"
+      - name: SCRAPER_JOB_CRAWL_INTERVAL_HOURS
+        value: "12.0"
       - name: SCRAPER_QUESTION_INTERVAL_MINUTES
         # Keep question extraction on a non-aligned cadence from the 1.5-minute
         # embed job so the shared scraper lock does not periodically collide.
@@ -204,6 +208,18 @@ services:
         value: https://www.nowcoder.com/discuss?type=2&order=3&query=%E9%9D%A2%E7%BB%8F,https://www.nowcoder.com/discuss?type=2&order=3&query=%E9%9D%A2%E8%AF%95,https://www.nowcoder.com/discuss?type=2&order=3&query=%E6%A0%A1%E6%8B%9B,https://www.nowcoder.com/discuss?type=2&order=3&query=%E5%AE%9E%E4%B9%A0,https://www.nowcoder.com/discuss?type=0&order=3,https://www.nowcoder.com/?target=main
       - name: SCRAPER_NOWCODER_LIMIT
         value: "200"
+      - name: SCRAPER_JOB_SOURCES
+        value: openquant,career_pages
+      - name: SCRAPER_OPENQUANT_API_BASE_URL
+        value: https://server.openquant.co
+      - name: SCRAPER_OPENQUANT_POSITION_TYPES
+        value: Quantitative Trader,Quantitative Researcher,Quantitative Developer,Quantitative Analyst,Data Scientist,Machine Learning Engineer
+      - name: SCRAPER_OPENQUANT_PAGE_SIZE
+        value: "100"
+      - name: SCRAPER_OPENQUANT_MAX_PAGES_PER_TYPE
+        value: "20"
+      - name: SCRAPER_CAREER_PAGE_MAX_LINKS_PER_COMPANY
+        value: "25"
 
     resources:
       requests:
