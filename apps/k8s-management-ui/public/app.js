@@ -10,6 +10,7 @@ const state = {
 const els = {
   clusterMode: document.querySelector("[data-testid='cluster-mode']"),
   summaryStrip: document.getElementById("summaryStrip"),
+  attentionPanel: document.getElementById("attentionPanel"),
   capacityStatus: document.getElementById("capacityStatus"),
   capacityNodeList: document.getElementById("capacityNodeList"),
   topPodRows: document.getElementById("topPodRows"),
@@ -58,6 +59,7 @@ async function refreshCluster() {
 function render() {
   if (!state.snapshot) return;
   renderSummary();
+  renderAttention();
   renderCapacity();
   renderStorage();
   renderNodes();
@@ -84,6 +86,65 @@ function renderSummary() {
     </div>
   `).join("");
   els.lastUpdated.textContent = formatTime(state.snapshot.generatedAt);
+}
+
+function renderAttention() {
+  const attention = state.snapshot.attention || { total: 0, issues: [] };
+  const issues = attention.issues || [];
+  const total = Number(attention.total || issues.length);
+  els.attentionPanel.className = `attention-panel ${total ? attention.highestSeverity || "warning" : "healthy"}`;
+
+  if (!total) {
+    els.attentionPanel.innerHTML = `
+      <div class="attention-summary">
+        <div>
+          <h2>Active Attention</h2>
+          <p>No active cluster issues detected.</p>
+        </div>
+        <span class="status-pill ready">healthy</span>
+      </div>
+    `;
+    return;
+  }
+
+  const visibleIssues = issues.slice(0, 6);
+  const remaining = total - visibleIssues.length;
+  els.attentionPanel.innerHTML = `
+    <div class="attention-summary">
+      <div>
+        <h2>Active Attention</h2>
+        <p>${escapeHtml(total)} issue${total === 1 ? "" : "s"} need operator review.</p>
+      </div>
+      <span class="status-pill ${escapeAttr(attention.highestSeverity || "warning")}">${escapeHtml(attention.highestSeverity || "warning")}</span>
+    </div>
+    <div class="attention-list">
+      ${visibleIssues.map(issueRow).join("")}
+      ${remaining > 0 ? `<div class="attention-more">${escapeHtml(remaining)} more issue${remaining === 1 ? "" : "s"} in cluster tables</div>` : ""}
+    </div>
+  `;
+}
+
+function issueRow(issue) {
+  const meta = issueMeta(issue);
+  return `
+    <article class="attention-item">
+      <span class="status-pill ${escapeAttr(issue.severity)}">${escapeHtml(issue.severity)}</span>
+      <div>
+        <h3>${escapeHtml(issue.title)}</h3>
+        <p>${escapeHtml(issue.detail)}</p>
+        ${meta ? `<p class="attention-meta">${escapeHtml(meta)}</p>` : ""}
+      </div>
+    </article>
+  `;
+}
+
+function issueMeta(issue) {
+  return [
+    issue.namespace && issue.name ? `${issue.namespace}/${issue.name}` : "",
+    issue.deployment ? `deployment ${issue.deployment}` : "",
+    issue.node ? `node ${issue.node}` : "",
+    issue.container ? `container ${issue.container}` : ""
+  ].filter(Boolean).join(" - ");
 }
 
 function renderCapacity() {

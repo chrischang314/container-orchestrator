@@ -6,12 +6,18 @@ const https = require("node:https");
 const DEFAULT_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token";
 const DEFAULT_CA_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 const EXTERNAL_WORKER_COMPONENT = "external-worker-switch";
+const HIGH_RESTART_COUNT = 5;
 const TOP_PODS_LIMIT = 8;
 const MEMORY_ELEVATED_PERCENT = 70;
 const MEMORY_HIGH_PERCENT = 85;
 const LOCAL_STORAGE_HINTS = ["local-path", "hostpath", "node-local"];
 const LOCAL_STORAGE_PROVISIONERS = ["rancher.io/local-path", "kubernetes.io/no-provisioner"];
 const NETWORK_STORAGE_HINTS = ["nfs", "synology", "longhorn", "ceph", "cinder", "efs", "azure", "gce", "gluster"];
+const SEVERITY_ORDER = new Map([
+  ["critical", 0],
+  ["warning", 1],
+  ["info", 2]
+]);
 const MEMORY_FACTORS = new Map([
   ["Ki", 1024],
   ["Mi", 1024 ** 2],
@@ -57,6 +63,21 @@ function containerSummary(container, statuses = []) {
     restarts: Number(status.restartCount || 0),
     state: stateName,
     started: Boolean(status.started)
+  };
+}
+
+function podSummary(pod) {
+  return {
+    namespace: pod.metadata?.namespace || "default",
+    name: pod.metadata?.name || "",
+    nodeName: pod.spec?.nodeName || "",
+    phase: pod.status?.phase || "Unknown",
+    hostIP: pod.status?.hostIP || "",
+    podIP: pod.status?.podIP || "",
+    restartCount: (pod.status?.containerStatuses || []).reduce((sum, item) => sum + Number(item.restartCount || 0), 0),
+    containers: (pod.spec?.containers || []).map((container) =>
+      containerSummary(container, pod.status?.containerStatuses || [])
+    )
   };
 }
 
@@ -500,27 +521,16 @@ function buildCapacitySnapshot(raw, podItems = raw.pods?.items || []) {
 
 function mapClusterSnapshot(raw, now = new Date()) {
   const podItems = raw.pods?.items || [];
+  const pods = podItems.map(podSummary);
   const deploymentItems = raw.deployments?.items || [];
   const podsByNode = new Map();
   const podNodeNames = new Map();
 
-  for (const pod of podItems) {
-    const nodeName = pod.spec?.nodeName || "unassigned";
-    const namespace = pod.metadata?.namespace || "default";
-    const name = pod.metadata?.name || "";
-    podNodeNames.set(`${namespace}/${name}`, nodeName);
+  for (const pod of pods) {
+    const nodeName = pod.nodeName || "unassigned";
+    podNodeNames.set(`${pod.namespace}/${pod.name}`, nodeName);
     if (!podsByNode.has(nodeName)) podsByNode.set(nodeName, []);
-    podsByNode.get(nodeName).push({
-      namespace,
-      name,
-      phase: pod.status?.phase || "Unknown",
-      hostIP: pod.status?.hostIP || "",
-      podIP: pod.status?.podIP || "",
-      restartCount: (pod.status?.containerStatuses || []).reduce((sum, item) => sum + Number(item.restartCount || 0), 0),
-      containers: (pod.spec?.containers || []).map((container) =>
-        containerSummary(container, pod.status?.containerStatuses || [])
-      )
-    });
+    podsByNode.get(nodeName).push(pod);
   }
 
   const nodes = (raw.nodes?.items || []).map((node) => {
@@ -605,6 +615,7 @@ function mapClusterSnapshot(raw, now = new Date()) {
       node: node.name
     }))
   );
+  const attention = deriveAttention({ nodes, pods, externalWorkers, deployments, containers });
 
   return {
     generatedAt: now.toISOString(),
@@ -622,10 +633,125 @@ function mapClusterSnapshot(raw, now = new Date()) {
     nodes,
     externalWorkers,
     deployments,
+    pods,
+    attention,
     containers,
     capacity: mapCapacity(raw, podNodeNames),
     storage: mapStorageReadiness(raw, podItems, deploymentItems)
   };
+}
+
+function deriveAttention(snapshot) {
+  const issues = [];
+
+  for (const node of snapshot.nodes || []) {
+    if (!node.online) {
+      issues.push(issue("node-offline", "critical", `Node ${node.name} is offline`, `${node.readyReason || "Ready"} is not reporting healthy.`, {
+        node: node.name
+      }));
+    }
+    if (!node.schedulable) {
+      issues.push(issue("node-cordoned", "warning", `Node ${node.name} is cordoned`, "New pods will not schedule here until the node is uncordoned.", {
+        node: node.name
+      }));
+    }
+  }
+
+  for (const worker of snapshot.externalWorkers || []) {
+    const desiredEnabled = Number(worker.desiredReplicas || 0) > 0 || worker.desiredState === "on";
+    const actualState = String(worker.actualState || "unknown").toLowerCase();
+    const stateNeedsAttention = ["off", "offline", "pending", "unknown"].includes(actualState);
+    if (desiredEnabled && (!worker.online || stateNeedsAttention)) {
+      issues.push(issue("external-worker-offline", "warning", `External worker ${worker.name} needs attention`, `${worker.namespace}/${worker.deployment} wants ${worker.desiredState || "on"} with ${worker.readyReplicas}/${worker.desiredReplicas} switch replicas ready; actual state is ${worker.actualState || "unknown"}.`, {
+        namespace: worker.namespace,
+        name: worker.name,
+        deployment: worker.deployment
+      }));
+    }
+  }
+
+  for (const deployment of snapshot.deployments || []) {
+    const replicas = Number(deployment.replicas || 0);
+    const readyReplicas = Number(deployment.readyReplicas || 0);
+    if (replicas > 0 && readyReplicas < replicas) {
+      issues.push(issue("deployment-unready", "warning", `Deployment ${deployment.namespace}/${deployment.name} is not ready`, `${readyReplicas}/${replicas} desired replicas are ready.`, {
+        namespace: deployment.namespace,
+        name: deployment.name,
+        deployment: deployment.name
+      }));
+    }
+  }
+
+  for (const pod of snapshot.pods || []) {
+    if (["Failed", "Pending", "Unknown"].includes(pod.phase)) {
+      issues.push(issue("pod-phase", pod.phase === "Failed" ? "critical" : "warning", `Pod ${pod.namespace}/${pod.name} is ${pod.phase.toLowerCase()}`, `Kubernetes reports phase ${pod.phase}${pod.nodeName ? ` on ${pod.nodeName}` : " before node assignment"}.`, {
+        namespace: pod.namespace,
+        name: pod.name,
+        node: pod.nodeName || undefined
+      }));
+    }
+  }
+
+  for (const container of snapshot.containers || []) {
+    if (container.phase === "Succeeded") continue;
+    if (!container.ready) {
+      issues.push(issue("container-not-ready", "warning", `Container ${container.namespace}/${container.pod}/${container.name} is not ready`, `State is ${container.state || "unknown"}${container.node ? ` on ${container.node}` : ""}.`, {
+        namespace: container.namespace,
+        name: container.pod,
+        node: container.node || undefined,
+        container: container.name
+      }));
+    }
+    if (Number(container.restarts || 0) >= HIGH_RESTART_COUNT) {
+      issues.push(issue("container-restarts-high", "warning", `Container ${container.namespace}/${container.pod}/${container.name} restarted ${container.restarts} times`, `Restart count is at or above the ${HIGH_RESTART_COUNT} restart attention threshold.`, {
+        namespace: container.namespace,
+        name: container.pod,
+        node: container.node || undefined,
+        container: container.name
+      }));
+    }
+  }
+
+  issues.sort((left, right) =>
+    (SEVERITY_ORDER.get(left.severity) ?? 99) - (SEVERITY_ORDER.get(right.severity) ?? 99) ||
+    left.kind.localeCompare(right.kind) ||
+    left.id.localeCompare(right.id)
+  );
+
+  return {
+    total: issues.length,
+    critical: issues.filter((item) => item.severity === "critical").length,
+    warning: issues.filter((item) => item.severity === "warning").length,
+    info: issues.filter((item) => item.severity === "info").length,
+    highestSeverity: issues[0]?.severity || "healthy",
+    issues
+  };
+}
+
+function issue(kind, severity, title, detail, fields = {}) {
+  const resourceId = [
+    fields.namespace,
+    fields.node,
+    fields.deployment,
+    fields.name,
+    fields.container
+  ].filter(Boolean).join("/");
+
+  return {
+    id: `${kind}:${resourceId || slug(title)}`,
+    severity,
+    kind,
+    title,
+    detail,
+    ...fields
+  };
+}
+
+function slug(value) {
+  return String(value || "issue")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 function createKubernetesClient(options = {}) {
@@ -978,6 +1104,7 @@ module.exports = {
   capacitySeverity,
   createKubernetesClient,
   demoRawCluster,
+  deriveAttention,
   httpsJson,
   mapCapacity,
   mapClusterSnapshot,

@@ -97,7 +97,7 @@ function publicClusterSnapshot(snapshot) {
   const rawNodes = snapshot.nodes || [];
   const rawDeployments = snapshot.deployments || [];
   const rawExternalWorkers = snapshot.externalWorkers || [];
-  const rawPods = rawNodes.flatMap((node) => node.pods || []);
+  const rawPods = snapshot.pods || rawNodes.flatMap((node) => node.pods || []);
   const namespaces = new Map();
   const capacityByNode = new Map((snapshot.capacity?.nodes || []).map((node) => [node.name, node]));
 
@@ -157,6 +157,7 @@ function publicClusterSnapshot(snapshot) {
       nodes: onlineNodes === nodes.length ? "healthy" : "attention",
       workloads: readyDeployments === rawDeployments.length ? "healthy" : "attention"
     },
+    attention: publicAttention(snapshot.attention),
     nodes,
     storage: publicStorageSnapshot(snapshot.storage),
     externalWorkers: rawExternalWorkers.map((worker) => ({
@@ -231,6 +232,31 @@ function publicStorageSnapshot(storage) {
       namespaces: Number(storage.summary?.namespaces || 0),
       storageClasses: Number(storage.summary?.storageClasses || 0)
     }
+  };
+}
+
+function publicAttention(attention = {}) {
+  const issues = (attention.issues || [])
+    .filter((item) => ["node-offline", "node-cordoned", "external-worker-offline", "deployment-unready", "pod-phase"].includes(item.kind))
+    .map((item) => ({
+      id: item.id,
+      severity: item.severity,
+      kind: item.kind,
+      title: item.title,
+      detail: item.detail,
+      namespace: item.namespace,
+      name: item.name,
+      node: item.node,
+      deployment: item.deployment
+    }));
+
+  return {
+    total: issues.length,
+    critical: issues.filter((item) => item.severity === "critical").length,
+    warning: issues.filter((item) => item.severity === "warning").length,
+    info: issues.filter((item) => item.severity === "info").length,
+    highestSeverity: issues[0]?.severity || "healthy",
+    issues
   };
 }
 
@@ -330,6 +356,7 @@ if (require.main === module) {
 module.exports = {
   createServer,
   publicCapacitySnapshot,
+  publicAttention,
   publicClusterSnapshot,
   requireMutationConfirmation,
   readJson

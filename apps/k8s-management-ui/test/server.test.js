@@ -211,6 +211,7 @@ test("public status mode serves sanitized cluster data and blocks controls", asy
     assert.equal(cluster.storage.available, true);
     assert.equal(cluster.storage.summary.pvcCount, 3);
     assert.equal(cluster.storage.claims, undefined);
+    assert.equal(cluster.attention.total, 0);
     assert.equal(cluster.nodes[0].capacity.memory.percentUsed, 73.5);
     assert.equal(cluster.externalWorkers[0].name, "chris-pc-2");
     assert.equal(cluster.capacity.available, true);
@@ -231,6 +232,41 @@ test("public status mode serves sanitized cluster data and blocks controls", asy
 
     const command = await postJson(`${base}/api/command`, { command: "kubectl get nodes" }, 403);
     assert.equal(command.ok, false);
+  } finally {
+    await close(server);
+  }
+});
+
+test("public status mode exposes only sanitized attention issues", async () => {
+  const raw = demoRawCluster();
+  raw.deployments.items[0].status.readyReplicas = 0;
+  raw.deployments.items[0].status.availableReplicas = 0;
+  raw.pods.items[0].status.containerStatuses[0].ready = false;
+  raw.pods.items[0].status.containerStatuses[0].restartCount = 9;
+
+  const server = createServer({
+    env: {
+      K8S_UI_DEMO: "true",
+      K8S_UI_PUBLIC_STATUS: "true"
+    },
+    client: {
+      mode: "test",
+      async snapshot() {
+        return mapClusterSnapshot(raw, new Date("2026-05-17T12:00:00Z"));
+      }
+    }
+  });
+
+  await listen(server);
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const cluster = await getJson(`${base}/api/cluster`);
+
+    assert.equal(cluster.attention.total, 1);
+    assert.equal(cluster.attention.issues[0].kind, "deployment-unready");
+    assert.equal(cluster.attention.issues[0].deployment, "k8s-management-ui-web");
+    assert.equal(JSON.stringify(cluster.attention).includes("pihole-6f9fb77c8d-n2z7x"), false);
+    assert.equal(JSON.stringify(cluster.attention).includes("container-not-ready"), false);
   } finally {
     await close(server);
   }
