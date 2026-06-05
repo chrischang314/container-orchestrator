@@ -32,6 +32,8 @@ services:
         value: /shared-auth/auth.db
       - name: ALLOWED_ORIGINS
         value: http://modelrailroadautomation.lan,http://projects.lan
+      - name: HARDWARE_CONTROL_ALLOWLIST
+        value: id:1,id:34
     persistence:
       - name: updater-state
         hostPath: /var/lib/csb1-ota-updater/state

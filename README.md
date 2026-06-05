@@ -57,7 +57,7 @@ numbers:
 | `http://k8s.lan/` | Kubernetes cluster management UI | Raspberry Pi 5 control plane |
 | `http://localagent.lan/` | Local Agent control UI; backend uses a Recreate rollout to avoid Mac Mini memory-pressure surges. | Mac Mini worker |
 | `http://localllm.lan/` | Local LLM chat frontend | Mac Mini worker |
-| `http://modelrailroadautomation.lan/` | Railroad control web server | Railroad Pi worker |
+| `http://modelrailroadautomation.lan/` | Railroad control web server with projects.lan SSO hardware control | Railroad Pi worker |
 | `http://modeltradingbot.lan/` | Trading bot frontend | Mac Mini worker |
 | `http://pihole.lan/` | Pi-hole web UI | Raspberry Pi 5 control plane |
 | `http://recruitingapp.lan/` | Recruiting/search app frontend | Mac Mini worker |
