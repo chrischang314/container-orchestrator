@@ -57,7 +57,7 @@ numbers:
 | `http://k8s.lan/` | Kubernetes cluster management UI | Raspberry Pi 5 control plane |
 | `http://localagent.lan/` | Local Agent control UI; backend uses a Recreate rollout to avoid Mac Mini memory-pressure surges. | Mac Mini worker |
 | `http://localllm.lan/` | Local LLM chat frontend | Mac Mini worker |
-| `http://modelrailroadautomation.lan/` | Railroad control web server with projects.lan SSO hardware control | Railroad Pi worker |
+| `http://modelrailroadautomation.lan/` | Railroad control web server with direct DCC-EX browser commands | Railroad Pi worker |
 | `http://modeltradingbot.lan/` | Trading bot frontend | Mac Mini worker |
 | `http://pihole.lan/` | Pi-hole web UI | Raspberry Pi 5 control plane |
 | `http://recruitingapp.lan/` | Recruiting/search app frontend | Mac Mini worker |
@@ -126,6 +126,8 @@ read/write the HttpOnly `projects_lan_session` cookie against shared `users` and
 proxying with a host-scoped cookie; the home launchpad should link users to
 those routes by default. Direct `.lan` hostnames remain useful diagnostics, but
 do not assume a browser will accept a cookie for the pseudo-domain `.lan`.
+Model railroad is intentionally not a shared-SSO participant; its browser route
+is a direct command surface for DCC-EX.
 
 ## Day-1 setup, end to end
 
@@ -188,9 +190,10 @@ scripts/                   deploy / status / switch-cluster
 ## Pi-hole on the Raspberry Pi
 
 Pi-hole runs as a K8s Deployment on the always-on Raspberry Pi with a
-`LoadBalancer` service that holds port 53 (TCP + UDP) for DNS. Its web UI is
-routed through ingress at `http://pihole.lan/`. Config is mounted from Pi host
-paths under `/srv/pihole`.
+`LoadBalancer` service that holds port 53 (TCP + UDP) for DNS and is restricted
+to the LAN CIDR in Helm values. Its web UI is a separate ClusterIP service
+routed through LAN-scoped ingress at `http://pihole.lan/`. Config is mounted
+from Pi host paths under `/srv/pihole`.
 
 **One-time setup (run once before first deploy):**
 
@@ -213,6 +216,8 @@ dig @192.168.4.56 google.com
 ```
 
 After verification, point the router's DNS/DHCP settings at `192.168.4.56`.
+Do not expose the Pi-hole web service directly; keep admin access through
+`pihole.lan`.
 
 **Notes:**
 
@@ -225,8 +230,33 @@ After verification, point the router's DNS/DHCP settings at `192.168.4.56`.
 - Pi-hole keeps rate limiting enabled, but `apps/pihole/values.yaml` raises the
   per-client limit to `10000` queries per `60` seconds because K3s
   ServiceLB/NAT can collapse many clients behind one pod-facing address.
+- Home Assistant browser access is ingress-only; the pod no longer uses
+  `hostNetwork`, so `192.168.4.56:8123` should not be reachable.
 - DHCP (port 67) is not exposed in K8s by default. If you use Pi-hole for DHCP,
   add `- name: dhcp / port: 67 / protocol: UDP` to `extraPorts`.
+
+## Cloudflare Tunnel And Access
+
+`apps/cloudflared/values.yaml` is a dormant Tunnel connector scaffold. It stays
+at `replicas: 0` until the Cloudflare tunnel token and Access policies are ready.
+Create the token secret, configure the public hostname in Cloudflare to route to
+`http://home-website-public.default.svc.cluster.local`, then scale the connector:
+
+```sh
+kubectl create secret generic cloudflared-tunnel \
+  --from-literal=token='<cloudflare-tunnel-token>'
+kubectl create secret generic cloudflare-access-home-website-public \
+  --from-literal=aud='<cloudflare-access-application-aud>' \
+  --from-literal=team-domain='<team>.cloudflareaccess.com'
+```
+
+After the Access application is live, set
+`CLOUDFLARE_ACCESS_REQUIRED=true` in
+`apps/home-website-public/values.yaml` and scale `cloudflared` to `1`.
+The public app proxy validates `Cf-Access-Jwt-Assertion` at the origin before
+forwarding sensitive app routes. Model railroad is excluded from origin-side
+Access validation so `/railroad-automation/` can pass browser DCC-EX command
+requests directly to the railroad service.
 
 ## Homebridge on the Raspberry Pi
 

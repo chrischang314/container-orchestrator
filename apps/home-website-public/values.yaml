@@ -28,6 +28,20 @@ services:
         value: public
       - name: PORT
         value: "8080"
+      - name: CLOUDFLARE_ACCESS_REQUIRED
+        value: "false"
+      - name: CLOUDFLARE_ACCESS_AUD
+        valueFrom:
+          secretKeyRef:
+            name: cloudflare-access-home-website-public
+            key: aud
+            optional: true
+      - name: CLOUDFLARE_ACCESS_TEAM_DOMAIN
+        valueFrom:
+          secretKeyRef:
+            name: cloudflare-access-home-website-public
+            key: team-domain
+            optional: true
       - name: MODEL_TRADING_BOT_PROXY_URL
         value: http://model-trading-bot-frontend.default.svc.cluster.local:14000
       - name: MODEL_TRADING_BOT_API_PROXY_URL
@@ -93,33 +107,3 @@ ingress:
         - chriswchang.com
         - www.chriswchang.com
       secretName: chriswchang-com-tls
-
-extraIngresses:
-  - name: home-website-public-model-trading-api
-    className: nginx
-    annotations:
-      nginx.ingress.kubernetes.io/use-regex: "true"
-      nginx.ingress.kubernetes.io/rewrite-target: /api/$2
-    hosts:
-      - host: chriswchang.com
-        paths:
-          - path: /model-trading-bot/api(/|$)(.*)
-            pathType: ImplementationSpecific
-            serviceName: model-trading-bot-backend
-            port: 8000
-      - host: www.chriswchang.com
-        paths:
-          - path: /model-trading-bot/api(/|$)(.*)
-            pathType: ImplementationSpecific
-            serviceName: model-trading-bot-backend
-            port: 8000
-      - paths:
-          - path: /model-trading-bot/api(/|$)(.*)
-            pathType: ImplementationSpecific
-            serviceName: model-trading-bot-backend
-            port: 8000
-    tls:
-      - hosts:
-          - chriswchang.com
-          - www.chriswchang.com
-        secretName: chriswchang-com-tls

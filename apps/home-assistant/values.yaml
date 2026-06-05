@@ -14,8 +14,10 @@ services:
     replicas: 1
     port: 8123
 
-    # Home Assistant discovery and several integrations expect the host network.
-    hostNetwork: true
+    # Keep the web UI off the Pi host network. Expose browser access through the
+    # LAN-scoped ingress only; add explicit device/host-network overrides later
+    # for integrations that truly need them.
+    hostNetwork: false
     strategy:
       type: Recreate
     nodeSelector:
@@ -30,10 +32,11 @@ services:
       - name: TZ
         value: America/New_York
 
-    # Matches Home Assistant's documented container install. This can be reduced
-    # later after confirming which integrations and host devices are required.
     securityContext:
-      privileged: true
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
 
     resources:
       requests:
@@ -76,6 +79,8 @@ services:
 ingress:
   enabled: true
   className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/whitelist-source-range: 192.168.4.0/22
   hosts:
     - host: homeassistant.lan
       paths:
@@ -83,4 +88,3 @@ ingress:
           pathType: Prefix
           service: server
           port: 8123
-

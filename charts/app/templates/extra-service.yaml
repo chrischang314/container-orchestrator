@@ -9,6 +9,13 @@ metadata:
     {{- include "app.serviceLabels" (dict "root" $ "service" $svc) | nindent 4 }}
 spec:
   type: {{ default "ClusterIP" $svc.serviceType }}
+  {{- with $svc.externalTrafficPolicy }}
+  externalTrafficPolicy: {{ . }}
+  {{- end }}
+  {{- with $svc.loadBalancerSourceRanges }}
+  loadBalancerSourceRanges:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   ports:
     {{- range $svc.ports }}
     - name: {{ .name }}

@@ -76,6 +76,8 @@ extraServices: []
 # - name: web
 #   component: pihole          # defaults to name; selector component to target
 #   serviceType: ClusterIP
+#   externalTrafficPolicy: Local
+#   loadBalancerSourceRanges: []
 #   ports:
 #     - name: http
 #       port: 80

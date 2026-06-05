@@ -1,0 +1,38 @@
+# Cloudflare Tunnel connector for publishing selected cluster services without
+# opening direct inbound router ports. Keep replicas at 0 until the tunnel token
+# secret exists and the Cloudflare Access application/policies are configured.
+
+namespace: default
+nameOverride: cloudflared
+
+services:
+  - name: tunnel
+    image: cloudflare/cloudflared
+    tag: latest
+    replicas: 0
+    autoDeploy:
+      enabled: false
+    command:
+      - cloudflared
+    args:
+      - tunnel
+      - --no-autoupdate
+      - run
+      - --token
+      - $(CLOUDFLARED_TOKEN)
+    env:
+      - name: CLOUDFLARED_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: cloudflared-tunnel
+            key: token
+            optional: true
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        memory: 256Mi
+
+ingress:
+  enabled: false

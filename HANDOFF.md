@@ -87,13 +87,14 @@ kubectl exec deploy/pihole-pihole -- pihole-FTL --config dns.hosts
 |---|---|---|---|---|
 | `home-website` | `ghcr.io/chrischang314/home-website:main` | `projects.lan` | `mac-mini-worker` | LAN launchpad. `homewebsite.lan` redirects here. User-facing links use `.lan`; status probes use internal K8s service DNS. |
 | `home-website-public` | `ghcr.io/chrischang314/home-website:public` | `chriswchang.com` | `mac-mini-worker` | Public portfolio with TLS via `letsencrypt-http01`; also catches direct public-IP HTTP requests. |
-| `home-assistant` | `ghcr.io/home-assistant/home-assistant:stable` | `homeassistant.lan` | `rpi5-control` | Uses `hostNetwork: true` for discovery/integrations. Config path is `/srv/home-assistant` on the Pi. |
+| `cloudflared` | `cloudflare/cloudflared:latest` | none | scaled to `0` | Dormant Cloudflare Tunnel connector. Create `cloudflared-tunnel`, configure Access, then scale to `1`. |
+| `home-assistant` | `ghcr.io/home-assistant/home-assistant:stable` | `homeassistant.lan` | `rpi5-control` | Ingress-only UI; host networking is disabled by default. Config path is `/srv/home-assistant` on the Pi. |
 | `homebridge` | `homebridge/homebridge:latest` | `homebridge.lan` | `rpi5-control` | Uses `hostNetwork: true` for HomeKit/mDNS reliability. Config path is `/srv/homebridge` on the Pi. |
 | `k8s-management-ui` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | `k8s.lan` | `rpi5-control` | LAN control panel for nodes, containers, deployments, read-only Metrics API capacity pressure, read-only PVC/PV/StorageClass readiness, and allowlisted kubectl controls. Mutating controls require UI confirmation and backend `confirmed: true` before execution; cluster-scoped RBAC remains the enforcement layer. |
 | `k8s-cluster-status` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | internal only | `rpi5-control` | Read-only public-status service for the portfolio `/cluster-status/` proxy. Uses read-only RBAC and sanitized aggregate output; capacity summaries omit detailed pod names, deployments scaled to `0` are inactive, and storage summaries omit PVC/PV/workload names. |
 | `local-agent` | `ghcr.io/chrischang314/local-agent/backend:main`, `frontend:main` | `localagent.lan` | `mac-mini-worker` | Backend and frontend are deployed with execution disabled. Worker replicas stay at 0 until a `worker:main` image exists and execution is intentionally enabled. Backend readiness checks `/api/health/ready` with an extended timeout for dependency checks that touch Synology NFS; liveness is a tolerant TCP check to avoid restarts during short NFS or app stalls. The backend uses `strategy.type: Recreate` because the Mac Mini worker cannot reliably fit a second backend pod during a rolling-update surge. |
 | `local-llm` | `ghcr.io/chrischang314/local-llm/*:main` | `localllm.lan` | `mac-mini-worker` | Backend reaches Ollama on the Mac host through `host.lima.internal:11434`, aliasing to `192.168.5.2`. |
-| `model-railroad-automation` | `ghcr.io/chrischang314/model-railroad-automation/web-control:main` | `modelrailroadautomation.lan` | `railroad-pi3` | Train web server; talks to DCC-EX at `192.168.4.22:2560`. Uses projects.lan SSO and allowlists Chris owner user IDs for hardware commands. |
+| `model-railroad-automation` | `ghcr.io/chrischang314/model-railroad-automation/web-control:main` | `modelrailroadautomation.lan` | `railroad-pi3` | Train web server; talks to DCC-EX at `192.168.4.22:2560`. Not shared-SSO mounted; deployed in direct browser-command mode. |
 | `model-trading-bot` | `ghcr.io/chrischang314/model-trading-bot/*:main` | `modeltradingbot.lan` | `mac-mini-worker` | Frontend plus backend with local data PVC on Synology NFS. The backend is a singleton with `strategy.type: Recreate`, `/health` readiness, and TCP liveness so brief NFS or data-provider stalls do not trigger liveness restarts. |
 | `pihole` | `pihole/pihole:latest` | `pihole.lan` | `rpi5-control` | DNS on port 53, web via ingress. Config paths are `/srv/pihole/etc-pihole` and `/srv/pihole/etc-dnsmasq.d`. |
 | `postgres` | `pgvector/pgvector:pg16` | internal only | `mac-mini-worker` | Shared PostgreSQL/pgvector database for recruiting app. Uses the `postgres-postgres-pgdata` PVC on the default `synology-nfs` StorageClass, `imagePullPolicy: IfNotPresent`, a 1 GiB memory limit, and readiness/startup probes only. Do not add a liveness probe unless there is a proven restart-safe failure mode. |
@@ -213,6 +214,7 @@ unless browser testing proves a wider `.lan` domain cookie is reliable. The
 home launchpad should send users to canonical `http://projects.lan/<app>/`
 routes by default; direct hostnames such as `localllm.lan` and
 `modeltradingbot.lan` remain diagnostics.
+Model railroad is not part of this SSO contract.
 
 `trading-bot-cache-sync` runs every 15 minutes in the `trading-bot` namespace.
 It mounts `trading-bot-public-cache` plus `trading-bot-parquet`, copies stable
@@ -269,8 +271,9 @@ move later if the NAS proves reliable and performant.
 - The K8s management UI treats confirmation as a guardrail, not authorization:
   the frontend asks before mutating actions, the API requires `confirmed: true`
   for mutating requests, and command allowlists/RBAC still enforce what can run.
-- Pi-hole web and Pi-hole DNS should be split: DNS keeps the `LoadBalancer`
-  port 53, while web is a ClusterIP routed through ingress.
+- Pi-hole web and Pi-hole DNS should stay split: DNS keeps the LAN-scoped
+  `LoadBalancer` port 53, while web is a ClusterIP routed through LAN-scoped
+  ingress.
 - The Mac Mini worker is a Lima VM. Its bridged network must use the active LAN
   interface; here that is `en1`, configured in
   `/Users/chrischang/.lima/_config/networks.yaml`.

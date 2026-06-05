@@ -5,6 +5,9 @@ const assert = require("node:assert/strict");
 const { createServer } = require("../src/server");
 const { mapClusterSnapshot, demoRawCluster } = require("../src/kubernetes");
 
+const ADMIN_TOKEN = "test-admin-token";
+const CSRF_TOKEN = "test-csrf-token";
+
 test("server exposes health, cluster, and command endpoints", async () => {
   const server = createServer({
     env: { K8S_UI_DEMO: "true", K8S_UI_ALLOW_MUTATIONS: "true" },
@@ -33,6 +36,8 @@ test("server exposes health, cluster, and command endpoints", async () => {
     const health = await getJson(`${base}/api/health`);
     assert.equal(health.ok, true);
     assert.equal(health.service, "k8s-management-ui");
+    assert.equal(health.mutations, false);
+    assert.equal(health.mutationAuthConfigured, false);
 
     const cluster = await getJson(`${base}/api/cluster`);
     assert.equal(cluster.summary.nodes, 2);
@@ -52,7 +57,7 @@ test("server exposes health, cluster, and command endpoints", async () => {
 test("server requires confirmation before mutating command execution", async () => {
   const calls = [];
   const server = createServer({
-    env: { K8S_UI_DEMO: "true", K8S_UI_ALLOW_MUTATIONS: "true" },
+    env: { K8S_UI_DEMO: "true", K8S_UI_ALLOW_MUTATIONS: "true", K8S_UI_ADMIN_TOKEN: ADMIN_TOKEN },
     client: {
       mode: "test",
       async snapshot() {
@@ -79,16 +84,26 @@ test("server requires confirmation before mutating command execution", async () 
     const readOnly = await postJson(`${base}/api/command`, { command: "kubectl get nodes" });
     assert.equal(readOnly.ok, true);
 
-    const blocked = await postJson(`${base}/api/command`, { command: "kubectl cordon mac-mini-worker" }, 409);
+    const blocked = await postJson(
+      `${base}/api/command`,
+      { command: "kubectl cordon mac-mini-worker" },
+      409,
+      adminHeaders()
+    );
     assert.equal(blocked.requiresConfirmation, true);
     assert.equal(blocked.confirmationRequired, true);
     assert.equal(blocked.command, "kubectl cordon mac-mini-worker");
     assert.deepEqual(calls, ["kubectl get nodes"]);
 
-    const confirmed = await postJson(`${base}/api/command`, {
-      command: "kubectl cordon mac-mini-worker",
-      confirmed: true
-    });
+    const confirmed = await postJson(
+      `${base}/api/command`,
+      {
+        command: "kubectl cordon mac-mini-worker",
+        confirmed: true
+      },
+      200,
+      adminHeaders()
+    );
     assert.equal(confirmed.ok, true);
     assert.deepEqual(calls, ["kubectl get nodes", "kubectl cordon mac-mini-worker"]);
   } finally {
@@ -99,7 +114,7 @@ test("server requires confirmation before mutating command execution", async () 
 test("server requires confirmation before mutating built-in actions", async () => {
   const calls = [];
   const server = createServer({
-    env: { K8S_UI_DEMO: "true", K8S_UI_ALLOW_MUTATIONS: "true" },
+    env: { K8S_UI_DEMO: "true", K8S_UI_ALLOW_MUTATIONS: "true", K8S_UI_ADMIN_TOKEN: ADMIN_TOKEN },
     client: {
       mode: "test",
       async snapshot() {
@@ -130,25 +145,208 @@ test("server requires confirmation before mutating built-in actions", async () =
     });
     assert.equal(readOnly.ok, true);
 
-    const blocked = await postJson(`${base}/api/action`, {
-      action: "restart-deployment",
-      namespace: "default",
-      name: "k8s-management-ui-web"
-    }, 409);
+    const blocked = await postJson(
+      `${base}/api/action`,
+      {
+        action: "restart-deployment",
+        namespace: "default",
+        name: "k8s-management-ui-web"
+      },
+      409,
+      adminHeaders()
+    );
     assert.equal(blocked.requiresConfirmation, true);
     assert.equal(blocked.confirmationRequired, true);
     assert.equal(blocked.command, "kubectl rollout restart deployment/k8s-management-ui-web -n default");
 
-    await postJson(`${base}/api/action`, {
-      action: "restart-deployment",
-      namespace: "default",
-      name: "k8s-management-ui-web",
-      confirmed: true
-    });
+    await postJson(
+      `${base}/api/action`,
+      {
+        action: "restart-deployment",
+        namespace: "default",
+        name: "k8s-management-ui-web",
+        confirmed: true
+      },
+      200,
+      adminHeaders()
+    );
     assert.deepEqual(calls, [
       "kubectl rollout status deployment/k8s-management-ui-web -n default",
       "kubectl rollout restart deployment/k8s-management-ui-web -n default"
     ]);
+  } finally {
+    await close(server);
+  }
+});
+
+test("server fails closed when mutations are enabled without an admin token", async () => {
+  const calls = [];
+  const server = createServer({
+    env: { K8S_UI_DEMO: "true", K8S_UI_ALLOW_MUTATIONS: "true" },
+    client: {
+      mode: "test",
+      async snapshot() {
+        return mapClusterSnapshot(demoRawCluster(), new Date("2026-05-17T12:00:00Z"));
+      }
+    },
+    async commandRunner(command) {
+      calls.push(command);
+      return { ok: true, code: 0, command, stdout: "ok", stderr: "", mutating: true };
+    }
+  });
+
+  await listen(server);
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const health = await getJson(`${base}/api/health`);
+    assert.equal(health.mutations, false);
+    assert.equal(health.mutationAuthConfigured, false);
+
+    const result = await postJson(
+      `${base}/api/command`,
+      { command: "kubectl cordon mac-mini-worker", confirmed: true },
+      403
+    );
+    assert.match(result.error, /ADMIN_TOKEN/);
+    assert.deepEqual(calls, []);
+  } finally {
+    await close(server);
+  }
+});
+
+test("server requires a valid admin token for mutating requests", async () => {
+  const calls = [];
+  const server = createServer({
+    env: { K8S_UI_DEMO: "true", K8S_UI_ALLOW_MUTATIONS: "true", K8S_UI_ADMIN_TOKEN: ADMIN_TOKEN },
+    client: {
+      mode: "test",
+      async snapshot() {
+        return mapClusterSnapshot(demoRawCluster(), new Date("2026-05-17T12:00:00Z"));
+      }
+    },
+    async commandRunner(command) {
+      calls.push(command);
+      return { ok: true, code: 0, command, stdout: "ok", stderr: "", mutating: true };
+    }
+  });
+
+  await listen(server);
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const health = await getJson(`${base}/api/health`);
+    assert.equal(health.mutations, true);
+    assert.equal(health.mutationAuthConfigured, true);
+
+    const missing = await postJson(
+      `${base}/api/command`,
+      { command: "kubectl cordon mac-mini-worker", confirmed: true },
+      401
+    );
+    assert.match(missing.error, /admin token/);
+
+    const invalid = await postJson(
+      `${base}/api/command`,
+      { command: "kubectl cordon mac-mini-worker", confirmed: true },
+      401,
+      { "X-K8S-UI-Admin-Token": "wrong" }
+    );
+    assert.match(invalid.error, /admin token/);
+
+    await postJson(
+      `${base}/api/command`,
+      { command: "kubectl cordon mac-mini-worker", confirmed: true },
+      200,
+      adminHeaders()
+    );
+    assert.deepEqual(calls, ["kubectl cordon mac-mini-worker"]);
+  } finally {
+    await close(server);
+  }
+});
+
+test("server rejects cross-origin mutating browser requests", async () => {
+  const calls = [];
+  const server = createServer({
+    env: { K8S_UI_DEMO: "true", K8S_UI_ALLOW_MUTATIONS: "true", K8S_UI_ADMIN_TOKEN: ADMIN_TOKEN },
+    client: {
+      mode: "test",
+      async snapshot() {
+        return mapClusterSnapshot(demoRawCluster(), new Date("2026-05-17T12:00:00Z"));
+      }
+    },
+    async commandRunner(command) {
+      calls.push(command);
+      return { ok: true, code: 0, command, stdout: "ok", stderr: "", mutating: true };
+    }
+  });
+
+  await listen(server);
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const blocked = await postJson(
+      `${base}/api/action`,
+      {
+        action: "restart-deployment",
+        namespace: "default",
+        name: "k8s-management-ui-web",
+        confirmed: true
+      },
+      403,
+      { ...adminHeaders(), Origin: "https://attacker.example" }
+    );
+    assert.match(blocked.error, /same-origin/);
+    assert.deepEqual(calls, []);
+  } finally {
+    await close(server);
+  }
+});
+
+test("server requires CSRF token pair for same-origin browser mutating requests", async () => {
+  const calls = [];
+  const server = createServer({
+    env: { K8S_UI_DEMO: "true", K8S_UI_ALLOW_MUTATIONS: "true", K8S_UI_ADMIN_TOKEN: ADMIN_TOKEN },
+    csrfToken: CSRF_TOKEN,
+    client: {
+      mode: "test",
+      async snapshot() {
+        return mapClusterSnapshot(demoRawCluster(), new Date("2026-05-17T12:00:00Z"));
+      }
+    },
+    async commandRunner(command) {
+      calls.push(command);
+      return { ok: true, code: 0, command, stdout: "ok", stderr: "", mutating: true };
+    }
+  });
+
+  await listen(server);
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const appShell = await fetch(`${base}/`);
+    const html = await appShell.text();
+    const cookie = appShell.headers.get("set-cookie");
+    assert.equal(html.includes("X-K8S-UI-CSRF-Token"), true);
+    assert.match(cookie, /k8s_ui_csrf=test-csrf-token/);
+
+    const blocked = await postJson(
+      `${base}/api/command`,
+      { command: "kubectl cordon mac-mini-worker", confirmed: true },
+      403,
+      { ...adminHeaders(), Origin: base, Cookie: "k8s_ui_csrf=test-csrf-token" }
+    );
+    assert.match(blocked.error, /CSRF/);
+
+    await postJson(
+      `${base}/api/command`,
+      { command: "kubectl cordon mac-mini-worker", confirmed: true },
+      200,
+      {
+        ...adminHeaders(),
+        Origin: base,
+        Cookie: "k8s_ui_csrf=test-csrf-token",
+        "X-K8S-UI-CSRF-Token": CSRF_TOKEN
+      }
+    );
+    assert.deepEqual(calls, ["kubectl cordon mac-mini-worker"]);
   } finally {
     await close(server);
   }
@@ -332,10 +530,14 @@ async function getText(url) {
   return response.text();
 }
 
-async function postJson(url, body, expectedStatus = 200) {
+function adminHeaders() {
+  return { Authorization: `Bearer ${ADMIN_TOKEN}` };
+}
+
+async function postJson(url, body, expectedStatus = 200, headers = {}) {
   const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...headers },
     body: JSON.stringify(body)
   });
   assert.equal(response.status, expectedStatus);

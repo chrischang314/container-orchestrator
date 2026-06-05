@@ -24,23 +24,16 @@ services:
         value: "2560"
       - name: DCCEX_MOCK
         value: "false"
+      - name: ALLOW_UNAUTHENTICATED_CONTROL
+        value: "true"
       - name: FIRMWARE_STATUS_FILE
         value: /state/firmware-status.json
       - name: FIRMWARE_STATUS_STALE_MS
         value: "604800000"
-      - name: SHARED_AUTH_DB
-        value: /shared-auth/auth.db
-      - name: ALLOWED_ORIGINS
-        value: http://modelrailroadautomation.lan,http://projects.lan
-      - name: HARDWARE_CONTROL_ALLOWLIST
-        value: id:1,id:34
     persistence:
       - name: updater-state
         hostPath: /var/lib/csb1-ota-updater/state
         mountPath: /state
-      - name: shared-auth
-        existingClaim: shared-auth-nfs
-        mountPath: /shared-auth
     resources:
       requests:
         cpu: 25m

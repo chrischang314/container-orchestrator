@@ -27,6 +27,9 @@ services:
     # through ingress as http://pihole.lan/admin/ so app hostnames can share
     # normal HTTP port 80.
     serviceType: LoadBalancer
+    externalTrafficPolicy: Local
+    loadBalancerSourceRanges:
+      - 192.168.4.0/22
 
     # DNS ports exposed on the LoadBalancer.
     extraPorts:
@@ -117,6 +120,7 @@ ingress:
   className: nginx
   annotations:
     nginx.ingress.kubernetes.io/app-root: /admin/
+    nginx.ingress.kubernetes.io/whitelist-source-range: 192.168.4.0/22
   hosts:
     - host: pihole.lan
       paths:
