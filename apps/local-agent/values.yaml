@@ -155,7 +155,7 @@ services:
     serviceName: local-agent-frontend
     image: ghcr.io/chrischang314/local-agent/frontend
     tag: main
-    digest: "sha256:171a54ca123cb09d8bf4bf41f7e72bd74ca689a5f2ec06283afe6afee9ef270f"
+    digest: "sha256:b9027273fdc3f16ff6cee9e9614b60344f3514998ad712ae59e48179af387781"
     autoDeploy:
       enabled: false
     serviceType: LoadBalancer
