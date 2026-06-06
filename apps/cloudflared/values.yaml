@@ -9,7 +9,9 @@ services:
   - name: tunnel
     image: cloudflare/cloudflared
     tag: latest
-    replicas: 0
+    replicas: 1
+    nodeSelector:
+      kubernetes.io/hostname: mac-mini-worker
     autoDeploy:
       enabled: false
     command:
