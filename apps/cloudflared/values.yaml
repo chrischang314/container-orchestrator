@@ -10,8 +10,6 @@ services:
     image: cloudflare/cloudflared
     tag: latest
     replicas: 1
-    nodeSelector:
-      kubernetes.io/hostname: mac-mini-worker
     autoDeploy:
       enabled: false
     command:

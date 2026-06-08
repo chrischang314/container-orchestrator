@@ -57,7 +57,11 @@ Ingress is `ingress-nginx` with a `LoadBalancer` service on normal web ports:
 The public portfolio is managed by the `home-website-public` Helm release. It
 routes `chriswchang.com`, `www.chriswchang.com`, and unmatched HTTP hosts to
 the sanitized public image. Public DNS is outside the cluster; `make status`
-compares the domain's A record with the current WAN IP.
+compares the domain's A record with the current WAN IP. The public deployment is
+stateless and should not be pinned to the Mac Mini worker; keep it schedulable
+on any ready node unless a future PVC/cache dependency requires a stable node.
+It exposes `home-website-public-web` for ingress and a compatibility
+`home-website-public` Service for the Cloudflare Tunnel target.
 
 Pi-hole DNS is exposed separately as a `LoadBalancer` service on TCP/UDP `53`.
 The Pi-hole web UI is a separate ClusterIP service named `pihole-web` and is
@@ -86,8 +90,8 @@ kubectl exec deploy/pihole-pihole -- pihole-FTL --config dns.hosts
 | App | Repo/image | LAN URL | Placement | Notes |
 |---|---|---|---|---|
 | `home-website` | `ghcr.io/chrischang314/home-website:main` | `projects.lan` | `mac-mini-worker` | LAN launchpad. `homewebsite.lan` redirects here. User-facing links use `.lan`; status probes use internal K8s service DNS. |
-| `home-website-public` | `ghcr.io/chrischang314/home-website:public` | `chriswchang.com` | `mac-mini-worker` | Public portfolio with TLS via `letsencrypt-http01`; also catches direct public-IP HTTP requests. |
-| `cloudflared` | `cloudflare/cloudflared:latest` | none | scaled to `0` | Dormant Cloudflare Tunnel connector. Create `cloudflared-tunnel`, configure Access, then scale to `1`. |
+| `home-website-public` | `ghcr.io/chrischang314/home-website:public` | `chriswchang.com` | any ready node | Public portfolio with TLS via `letsencrypt-http01`; also catches direct public-IP HTTP requests. Anonymous portfolio/API paths are public, while home-network proxy routes require Cloudflare Access at the origin. |
+| `cloudflared` | `cloudflare/cloudflared:latest` | none | any ready node | Cloudflare Tunnel connector for the public portfolio. It is stateless and should not be pinned to the Mac Mini worker. Requires the `cloudflared-tunnel` secret. |
 | `home-assistant` | `ghcr.io/home-assistant/home-assistant:stable` | `homeassistant.lan` | `rpi5-control` | Ingress-only UI; host networking is disabled by default. Config path is `/srv/home-assistant` on the Pi. |
 | `homebridge` | `homebridge/homebridge:latest` | `homebridge.lan` | `rpi5-control` | Uses `hostNetwork: true` for HomeKit/mDNS reliability. Config path is `/srv/homebridge` on the Pi. |
 | `k8s-management-ui` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | `k8s.lan` | `rpi5-control` | LAN control panel for nodes, containers, deployments, read-only Metrics API capacity pressure, read-only PVC/PV/StorageClass readiness, and allowlisted kubectl controls. Mutating controls require UI confirmation and backend `confirmed: true` before execution; cluster-scoped RBAC remains the enforcement layer. |

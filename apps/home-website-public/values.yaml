@@ -7,18 +7,17 @@ imagePullSecrets:
 
 services:
   - name: web
-    resourceName: home-website-public
-    serviceName: home-website-public
     image: ghcr.io/chrischang314/home-website
     tag: public
     port: 80
     targetPort: 8080
     containerPort: 8080
     replicas: 1
-    nodeSelector:
-      kubernetes.io/hostname: mac-mini-worker
     selectorLabels:
       app: home-website-public
+      app.kubernetes.io/component: web
+      app.kubernetes.io/instance: home-website-public
+      app.kubernetes.io/name: home-website-public
     autoDeploy:
       enabled: true
       pollSchedule: "@every 5m"
@@ -73,6 +72,17 @@ services:
         initialDelaySeconds: 15
         periodSeconds: 20
 
+extraServices:
+  # Compatibility service for the Cloudflare Tunnel public hostname target. The
+  # chart-native web Service remains `home-website-public-web` for ingress.
+  - name: web-alias
+    component: web
+    serviceName: home-website-public
+    ports:
+      - name: http
+        port: 80
+        targetPort: http
+
 ingress:
   enabled: true
   name: home-website-public
@@ -85,14 +95,12 @@ ingress:
         - path: /
           pathType: Prefix
           service: web
-          backendServiceName: home-website-public
           port: 80
     - host: www.chriswchang.com
       paths:
         - path: /
           pathType: Prefix
           service: web
-          backendServiceName: home-website-public
           port: 80
     # Default route for direct public-IP HTTP requests. HTTPS by IP will still
     # show a certificate name mismatch because public certs cannot cover this IP.
@@ -100,7 +108,6 @@ ingress:
         - path: /
           pathType: Prefix
           service: web
-          backendServiceName: home-website-public
           port: 80
   tls:
     - hosts:

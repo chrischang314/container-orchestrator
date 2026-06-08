@@ -75,6 +75,11 @@ through the `.lan` ingress hostnames above.
 `https://www.chriswchang.com/` from the public `home-website:public` image. It
 also has a hostless HTTP ingress rule so direct public-IP HTTP requests route to
 the portfolio instead of nginx's default 404.
+The public deployment is stateless and is not pinned to the Mac Mini worker, so
+it can stay online on another ready node if the Mac Mini is unavailable.
+It exposes both the chart-native `home-website-public-web` Service for ingress
+and a compatibility `home-website-public` Service for Cloudflare Tunnel public
+hostname routing.
 
 The domain's DNS A record must still point at the current home WAN IP. Run
 `make status` to compare public DNS with the detected WAN IP and verify the
@@ -238,9 +243,10 @@ Do not expose the Pi-hole web service directly; keep admin access through
 ## Cloudflare Tunnel And Access
 
 `apps/cloudflared/values.yaml` is a dormant Tunnel connector scaffold. It stays
-at `replicas: 0` until the Cloudflare tunnel token and Access policies are ready.
+disabled until the Cloudflare tunnel token and Access policies are ready.
 Create the token secret, configure the public hostname in Cloudflare to route to
-`http://home-website-public.default.svc.cluster.local`, then scale the connector:
+`http://home-website-public.default.svc.cluster.local`, then scale the connector
+to `1`:
 
 ```sh
 kubectl create secret generic cloudflared-tunnel \
@@ -254,9 +260,10 @@ After the Access application is live, set
 `CLOUDFLARE_ACCESS_REQUIRED=true` in
 `apps/home-website-public/values.yaml` and scale `cloudflared` to `1`.
 The public app proxy validates `Cf-Access-Jwt-Assertion` at the origin before
-forwarding sensitive app routes. Model railroad is excluded from origin-side
-Access validation so `/railroad-automation/` can pass browser DCC-EX command
-requests directly to the railroad service.
+forwarding sensitive app routes. Public portfolio pages and health/site APIs
+remain anonymous, but routes that can touch home-network services, including
+`/railroad-automation/`, require Cloudflare Access at the origin.
+The connector is stateless and should not be pinned to the Mac Mini worker.
 
 ## Homebridge on the Raspberry Pi
 
