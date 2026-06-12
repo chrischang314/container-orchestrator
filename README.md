@@ -51,7 +51,7 @@ numbers:
 
 | URL | Workload | Placement |
 |---|---|---|
-| `http://projects.lan/` | Homelab launchpad and portfolio preview. `homewebsite.lan` redirects here. | Mac Mini worker |
+| `http://projects.lan/` | Homelab launchpad and portfolio preview. `homewebsite.lan` redirects here. | Any ready node |
 | `http://homeassistant.lan/` | Home Assistant UI | Raspberry Pi 5 control plane |
 | `http://homebridge.lan/` | Homebridge UI | Raspberry Pi 5 control plane |
 | `http://k8s.lan/` | Kubernetes cluster management UI | Raspberry Pi 5 control plane |

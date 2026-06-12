@@ -12,8 +12,6 @@ services:
     port: 80
     containerPort: 8080
     replicas: 1
-    nodeSelector:
-      kubernetes.io/hostname: mac-mini-worker
     autoDeploy:
       enabled: true
       pollSchedule: "@every 5m"

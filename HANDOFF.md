@@ -89,7 +89,7 @@ kubectl exec deploy/pihole-pihole -- pihole-FTL --config dns.hosts
 
 | App | Repo/image | LAN URL | Placement | Notes |
 |---|---|---|---|---|
-| `home-website` | `ghcr.io/chrischang314/home-website:main` | `projects.lan` | `mac-mini-worker` | LAN launchpad. `homewebsite.lan` redirects here. User-facing links use `.lan`; status probes use internal K8s service DNS. |
+| `home-website` | `ghcr.io/chrischang314/home-website:main` | `projects.lan` | any ready node | LAN launchpad. `homewebsite.lan` redirects here. User-facing links use `.lan`; status probes use internal K8s service DNS. Keep this low-resource private launchpad unpinned so it can stay online while the Mac Mini worker is unavailable. |
 | `home-website-public` | `ghcr.io/chrischang314/home-website:public` | `chriswchang.com` | any ready node | Public portfolio with TLS via `letsencrypt-http01`; also catches direct public-IP HTTP requests. Anonymous portfolio/API paths are public, while home-network proxy routes require Cloudflare Access at the origin. |
 | `cloudflared` | `cloudflare/cloudflared:latest` | none | any ready node | Cloudflare Tunnel connector for the public portfolio. It is stateless and should not be pinned to the Mac Mini worker. Requires the `cloudflared-tunnel` secret. |
 | `home-assistant` | `ghcr.io/home-assistant/home-assistant:stable` | `homeassistant.lan` | `rpi5-control` | Ingress-only UI; host networking is disabled by default. Config path is `/srv/home-assistant` on the Pi. |
