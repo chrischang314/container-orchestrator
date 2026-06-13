@@ -58,7 +58,7 @@ numbers:
 | `http://localagent.lan/` | Local Agent control UI; backend uses a Recreate rollout to avoid Mac Mini memory-pressure surges. | Mac Mini worker |
 | `http://localllm.lan/` | Local LLM chat frontend | Mac Mini worker |
 | `http://modelrailroadautomation.lan/` | Railroad control web server with direct DCC-EX browser commands | Railroad Pi worker |
-| `http://modeltradingbot.lan/` | Trading bot frontend | Mac Mini worker |
+| `http://modeltradingbot.lan/` | Trading bot frontend | Raspberry Pi 5 control plane |
 | `http://pihole.lan/` | Pi-hole web UI | Raspberry Pi 5 control plane |
 | `http://recruitingapp.lan/` | Recruiting/search app frontend | Mac Mini worker |
 
@@ -117,10 +117,11 @@ backend. The backend uses a `Recreate` rollout because the Mac Mini worker does
 not have enough spare requested memory to run a second backend pod during a
 rolling update.
 
-Model Trading Bot also has a PVC-backed backend on the Mac Mini worker. Keep it
-on a `Recreate` rollout, dependency-aware `/health` readiness, and TCP liveness
-so brief NFS or data-provider stalls do not cause liveness restarts while the
-frontend remains available through `modeltradingbot.lan`.
+Model Trading Bot has a Synology-NFS-backed backend and can run on the
+always-on Raspberry Pi 5 control plane when the Mac Mini worker is unavailable.
+Keep it on a `Recreate` rollout, dependency-aware `/health` readiness, and TCP
+liveness so brief NFS or data-provider stalls do not cause liveness restarts
+while the frontend remains available through `modeltradingbot.lan`.
 
 Projects LAN apps share one server-side SSO contract through the platform-owned
 `shared-auth-nfs` PVC mounted at `/shared-auth`. `make deploy` applies
@@ -326,10 +327,12 @@ Synology, but it should not be on the critical startup path for
 3. Stateful pods retain their PVCs across the rollout.
 
 Local Agent and Model Trading Bot are exceptions to the default rolling-update
-strategy: their backends are singleton PVC-backed services pinned to
-`mac-mini-worker`, so their app values use `strategy.type: Recreate` to prevent
-a second backend pod from being scheduled during a surge or mounting the same
-data claim.
+strategy: their backends are singleton PVC-backed services, so their app values
+use `strategy.type: Recreate` to prevent a second backend pod from being
+scheduled during a surge or mounting the same data claim. Local Agent remains
+Mac Mini pinned for its enabled execution worker; Model Trading Bot is
+Synology-NFS-backed and is kept on `rpi5-control` so it stays online during a
+Mac Mini outage.
 
 The in-repo `k8s-management-ui` workflow builds and pushes
 `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` from this

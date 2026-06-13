@@ -79,10 +79,10 @@ they are the direct cause of the outage.
 - Local LLM's backend is a PVC-backed singleton using SQLite plus a persisted
   JWT signing key under `/app/data`; keep `strategy.type: Recreate` so Keel
   updates never overlap two pods on the same account/session volume.
-- Model Trading Bot's backend is also a PVC-backed singleton on
-  `mac-mini-worker`. Keep `strategy.type: Recreate`, `/health` readiness, and
-  TCP liveness so transient Synology NFS or provider stalls do not cause
-  liveness restart loops.
+- Model Trading Bot's backend is a Synology-NFS-backed singleton. Keep it on
+  `rpi5-control` during Mac Mini outages, and keep `strategy.type: Recreate`,
+  `/health` readiness, and TCP liveness so transient Synology NFS or provider
+  stalls do not cause liveness restart loops.
 
 ## Projects LAN Shared SSO
 
