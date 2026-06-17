@@ -13,6 +13,8 @@ services:
     targetPort: 8080
     containerPort: 8080
     replicas: 1
+    nodeSelector:
+      kubernetes.io/hostname: rpi5-control
     selectorLabels:
       app: home-website-public
       app.kubernetes.io/component: web
@@ -28,7 +30,7 @@ services:
       - name: PORT
         value: "8080"
       - name: CLOUDFLARE_ACCESS_REQUIRED
-        value: "true"
+        value: "false"
       - name: CLOUDFLARE_ACCESS_AUD
         valueFrom:
           secretKeyRef:
