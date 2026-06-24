@@ -47,6 +47,21 @@ allowlisted `kubectl` controls.
   still returns, and public status mode receives only node-pressure aggregates
   without detailed pod names.
 
+## Public Portfolio Boundary
+
+`apps/home-website-public/values.yaml` keeps
+`CLOUDFLARE_ACCESS_REQUIRED=true` so the origin can validate Access JWTs for
+protected public routes. The home-website app decides which public proxy paths
+require that JWT. As of this boundary, `/model-trading-bot/*`,
+`/trading-bot/*`, `/local-llm/*`, `/local-agent/*`, and `/cluster-status/*`
+are public-safe demo routes. `/recruiting-app/*` and
+`/railroad-automation/*` stay protected because they can expose private
+recruiting workflow data or live hardware controls.
+
+Cloudflare edge policy should match this split on both `chriswchang.com` and
+`www.chriswchang.com`: bypass Access for the portfolio, public APIs, static
+assets, and public-safe demo routes; require Access for the protected routes.
+
 ## Rollback Notes
 
 If the confirmation UI blocks normal operations, revert the selected

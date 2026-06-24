@@ -85,6 +85,14 @@ The domain's DNS A record must still point at the current home WAN IP. Run
 `make status` to compare public DNS with the detected WAN IP and verify the
 origin health path.
 
+Public-safe demo paths are intended to be reachable without Cloudflare Access:
+`/model-trading-bot/*`, `/trading-bot/*`, `/local-llm/*`, `/local-agent/*`,
+and `/cluster-status/*`. Keep Cloudflare edge policy path-scoped on both
+`chriswchang.com` and `www.chriswchang.com`: bypass Access for the portfolio
+and these safe demo paths, and require Access for `/recruiting-app/*` and
+`/railroad-automation/*`. The public app keeps origin JWT validation enabled as
+a second guard for those protected routes.
+
 Recruiting app note: the scraper now requires a copied
 `data/storage_state.json` for authenticated 1point3acres access. It uses the
 Discuz mobile JSON endpoint plus rendered-page enrichment, with embeddings
@@ -257,13 +265,12 @@ kubectl create secret generic cloudflare-access-home-website-public \
   --from-literal=team-domain='<team>.cloudflareaccess.com'
 ```
 
-After the Access application is live, set
-`CLOUDFLARE_ACCESS_REQUIRED=true` in
-`apps/home-website-public/values.yaml` and scale `cloudflared` to `1`.
-The public app proxy validates `Cf-Access-Jwt-Assertion` at the origin before
-forwarding sensitive app routes. Public portfolio pages and health/site APIs
-remain anonymous, but routes that can touch home-network services, including
-`/railroad-automation/`, require Cloudflare Access at the origin.
+Keep `CLOUDFLARE_ACCESS_REQUIRED=true` in
+`apps/home-website-public/values.yaml` after the Access secret exists. The
+public app proxy validates `Cf-Access-Jwt-Assertion` at the origin before
+forwarding protected routes. Public portfolio pages, health/site APIs, and
+public-safe demos remain anonymous, but `/recruiting-app/*` and
+`/railroad-automation/*` require Cloudflare Access at the origin.
 The connector is stateless and should not be pinned to the Mac Mini worker.
 
 ## Homebridge on the Raspberry Pi

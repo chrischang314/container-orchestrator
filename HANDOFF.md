@@ -62,6 +62,11 @@ stateless and should not be pinned to the Mac Mini worker; keep it schedulable
 on any ready node unless a future PVC/cache dependency requires a stable node.
 It exposes `home-website-public-web` for ingress and a compatibility
 `home-website-public` Service for the Cloudflare Tunnel target.
+Public-safe demo paths should stay anonymous on both `chriswchang.com` and
+`www.chriswchang.com`: `/model-trading-bot/*`, `/trading-bot/*`,
+`/local-llm/*`, `/local-agent/*`, and `/cluster-status/*`. Keep Cloudflare
+Access required at the edge and origin for `/recruiting-app/*` and
+`/railroad-automation/*`.
 
 Pi-hole DNS is exposed separately as a `LoadBalancer` service on TCP/UDP `53`.
 The Pi-hole web UI is a separate ClusterIP service named `pihole-web` and is
