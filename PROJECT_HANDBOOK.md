@@ -27,14 +27,15 @@ allowlisted `kubectl` controls.
   local-path or node-local storage as high risk. Pending, lost, unbound, or
   partially inventoried claims stay visible as attention items instead of
   failing the whole cluster snapshot.
-- The public `k8s-cluster-status` deployment may show node-level capacity
-  summaries, but it must not expose detailed top-pod names.
+- The public `k8s-cluster-status` deployment may show aggregate capacity
+  posture, but it must not expose node names, node-level percentages, exact
+  inventory counts, or detailed top-pod names.
 - Public status treats deployments scaled to `0` replicas as inactive instead
   of unhealthy, which avoids false attention for dormant worker switches and
   sandbox placeholders.
-- The public `k8s-cluster-status` deployment may show aggregate storage counts,
-  but it must not expose PVC names, PV names, or workload-specific storage
-  details.
+- The public `k8s-cluster-status` deployment may show coarse storage risk and
+  storage profile booleans, but it must not expose PVC names, PV names,
+  namespace names, workload-specific storage details, or exact storage counts.
 - Read-only commands and status actions run directly.
 - Mutating built-in actions and typed mutating commands open a confirmation
   dialog before any network request is sent.
@@ -44,8 +45,8 @@ allowlisted `kubectl` controls.
 - Public status mode remains read-only and returns sanitized cluster data.
 - Capacity data is read from the Kubernetes Metrics API, not by shelling out to
   `kubectl top`. Metrics failures are non-fatal: the normal cluster snapshot
-  still returns, and public status mode receives only node-pressure aggregates
-  without detailed pod names.
+  still returns, and public status mode receives only coarse pressure levels
+  without node names or detailed pod names.
 
 ## Public Portfolio Boundary
 
@@ -61,6 +62,9 @@ recruiting workflow data or live hardware controls.
 Cloudflare edge policy should match this split on both `chriswchang.com` and
 `www.chriswchang.com`: bypass Access for the portfolio, public APIs, static
 assets, and public-safe demo routes; require Access for the protected routes.
+The `/cluster-status/` public demo depends on `k8s-cluster-status` returning
+aggregate-only JSON. Do not add node, namespace, worker, deployment, pod, PVC,
+PV, image, exact-count, or issue-detail fields to that public mode.
 
 ## Rollback Notes
 

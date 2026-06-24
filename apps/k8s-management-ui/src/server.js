@@ -228,158 +228,109 @@ function publicClusterSnapshot(snapshot) {
   const rawNodes = snapshot.nodes || [];
   const rawDeployments = snapshot.deployments || [];
   const rawExternalWorkers = snapshot.externalWorkers || [];
-  const rawPods = snapshot.pods || rawNodes.flatMap((node) => node.pods || []);
-  const namespaces = new Map();
-  const capacityByNode = new Map((snapshot.capacity?.nodes || []).map((node) => [node.name, node]));
-
-  for (const pod of rawPods) {
-    const item = ensureNamespace(namespaces, pod.namespace || "default");
-    item.pods += 1;
-    if (pod.phase === "Running") item.runningPods += 1;
-    item.restarts += Number(pod.restartCount || 0);
-  }
-
-  for (const deployment of rawDeployments) {
-    const item = ensureNamespace(namespaces, deployment.namespace || "default");
-    item.deployments += 1;
-    item.replicas += Number(deployment.replicas || 0);
-    item.readyReplicas += Number(deployment.readyReplicas || 0);
-    if (isDeploymentReady(deployment)) item.readyDeployments += 1;
-  }
-
-  const nodes = rawNodes.map((node) => ({
-    name: node.name,
-    role: node.role,
-    online: Boolean(node.online),
-    readyReason: node.readyReason,
-    schedulable: Boolean(node.schedulable),
-    kubeletVersion: node.kubeletVersion,
-    architecture: node.architecture,
-    podCount: Number(node.podCount || 0),
-    containerCount: Number(node.containerCount || 0),
-    capacity: publicNodeCapacity(capacityByNode.get(node.name))
-  }));
-
-  const namespaceRows = Array.from(namespaces.values()).sort((left, right) =>
-    left.namespace.localeCompare(right.namespace)
-  );
-  const runningPods = namespaceRows.reduce((sum, item) => sum + item.runningPods, 0);
   const readyDeployments = rawDeployments.filter(isDeploymentReady).length;
-  const onlineNodes = nodes.filter((node) => node.online).length;
+  const onlineNodes = rawNodes.filter((node) => node.online).length;
+  const nodeHealth = onlineNodes === rawNodes.length ? "healthy" : "attention";
+  const workloadHealth = readyDeployments === rawDeployments.length ? "healthy" : "attention";
+  const storage = publicStorageSnapshot(snapshot.storage);
+  const capacity = publicCapacitySnapshot(snapshot.capacity);
+  const attention = publicAttention(snapshot.attention);
+  const externalAutomation = externalAutomationStatus(rawExternalWorkers);
+  const storageHealth = storage?.risk?.high
+    ? "critical"
+    : storage?.risk?.attention || storage?.partial
+      ? "attention"
+      : "healthy";
+  const capacityHealth = capacity.level === "high"
+    ? "critical"
+    : capacity.level === "elevated"
+      ? "attention"
+      : capacity.available
+        ? "healthy"
+        : "unknown";
+  const overall = [nodeHealth, workloadHealth, storageHealth, capacityHealth, externalAutomation].includes("critical")
+    ? "critical"
+    : [nodeHealth, workloadHealth, storageHealth, capacityHealth, externalAutomation].includes("attention")
+      ? "attention"
+      : "healthy";
 
   return {
     generatedAt: snapshot.generatedAt,
     mode: "public-status",
     summary: {
-      nodes: nodes.length,
-      onlineNodes,
-      controlPlaneNodes: Number(snapshot.summary?.controlPlaneNodes || 0),
-      workerNodes: Number(snapshot.summary?.workerNodes || 0),
-      externalWorkers: rawExternalWorkers.length,
-      externalWorkersOnline: rawExternalWorkers.filter((worker) => worker.online).length,
-      pods: Number(snapshot.summary?.pods || rawPods.length),
-      runningPods,
-      containers: Number(snapshot.summary?.containers || 0),
-      deployments: rawDeployments.length,
-      readyDeployments,
-      namespaces: namespaceRows.length
+      overall,
+      controlPlane: nodeHealth,
+      workloads: workloadHealth,
+      storage: storageHealth,
+      capacity: capacityHealth,
+      externalAutomation,
+      lastUpdatedSecondsAgo: 0
     },
     health: {
-      nodes: onlineNodes === nodes.length ? "healthy" : "attention",
-      workloads: readyDeployments === rawDeployments.length ? "healthy" : "attention"
+      nodes: nodeHealth,
+      workloads: workloadHealth,
+      storage: storageHealth,
+      capacity: capacityHealth
     },
-    attention: publicAttention(snapshot.attention),
-    nodes,
-    storage: publicStorageSnapshot(snapshot.storage),
-    externalWorkers: rawExternalWorkers.map((worker) => ({
-      name: worker.name,
-      online: Boolean(worker.online),
-      desiredState: worker.desiredState,
-      actualState: worker.actualState
-    })),
-    namespaces: namespaceRows,
-    capacity: publicCapacitySnapshot(snapshot.capacity)
+    attention,
+    capacity,
+    storage,
+    demo: {
+      message: "Live Kubernetes-backed home lab status",
+      refreshSeconds: 15
+    }
   };
 }
 
 function publicCapacitySnapshot(capacity = {}) {
   const nodes = capacity.nodes || [];
+  const high = Number(capacity.summary?.highMemoryNodes || nodes.filter((node) => (node.memory?.severity || node.severity) === "high").length);
+  const elevated = Number(capacity.summary?.elevatedMemoryNodes || nodes.filter((node) => (node.memory?.severity || node.severity) === "elevated").length);
+  const level = high ? "high" : elevated ? "elevated" : capacity.available ? "normal" : "unknown";
   return {
     available: Boolean(capacity.available),
-    source: capacity.source,
-    message: capacity.available ? capacity.message : "Metrics API unavailable.",
-    reason: capacity.available ? "" : capacity.reason || capacity.message || "Metrics API unavailable.",
-    nodePressure: nodes.map((node) => ({
-      name: node.name,
-      cpuPercentUsed: node.cpu?.percentUsed ?? null,
-      memoryPercentUsed: node.memory?.percentUsed ?? null,
-      memorySeverity: node.memory?.severity || node.severity || "unknown"
-    })),
-    summary: {
-      normalNodes: nodes.filter((node) => (node.memory?.severity || node.severity) === "normal").length,
-      elevatedNodes: nodes.filter((node) => (node.memory?.severity || node.severity) === "elevated").length,
-      highNodes: nodes.filter((node) => (node.memory?.severity || node.severity) === "high").length,
-      nodeCount: Number(capacity.summary?.nodeCount || nodes.length),
-      topPodCount: Number(capacity.summary?.topPodCount || 0),
-      elevatedMemoryNodes: Number(capacity.summary?.elevatedMemoryNodes || 0),
-      highMemoryNodes: Number(capacity.summary?.highMemoryNodes || 0),
-      maxMemoryPercent: capacity.summary?.maxMemoryPercent ?? null
+    level,
+    pressure: {
+      normal: level === "normal",
+      elevated: level === "elevated",
+      high: level === "high"
     }
-  };
-}
-
-function publicNodeCapacity(capacity) {
-  if (!capacity) return undefined;
-  return {
-    cpu: {
-      usageDisplay: capacity.cpu?.usageDisplay || "",
-      percentUsed: capacity.cpu?.percentUsed ?? null
-    },
-    memory: {
-      usageDisplay: capacity.memory?.usageDisplay || "",
-      percentUsed: capacity.memory?.percentUsed ?? null
-    },
-    severity: capacity.severity || "unknown"
   };
 }
 
 function publicStorageSnapshot(storage) {
   if (!storage) return undefined;
+  const summary = storage.summary || {};
   return {
     available: Boolean(storage.available),
     partial: Boolean(storage.partial),
-    source: storage.source,
-    message: storage.available ? storage.message : "Storage inventory unavailable.",
-    summary: {
-      pvcCount: Number(storage.summary?.pvcCount || 0),
-      bound: Number(storage.summary?.bound || 0),
-      pending: Number(storage.summary?.pending || 0),
-      lost: Number(storage.summary?.lost || 0),
-      highRisk: Number(storage.summary?.highRisk || 0),
-      attention: Number(storage.summary?.attention || 0),
-      localPath: Number(storage.summary?.localPath || 0),
-      network: Number(storage.summary?.network || 0),
-      unknownStorage: Number(storage.summary?.unknownStorage || 0),
-      namespaces: Number(storage.summary?.namespaces || 0),
-      storageClasses: Number(storage.summary?.storageClasses || 0)
+    risk: {
+      normal: !Number(summary.highRisk || 0) && !Number(summary.attention || 0) && !Number(summary.pending || 0) && !Number(summary.lost || 0),
+      attention: Boolean(Number(summary.attention || 0) || Number(summary.pending || 0) || Number(summary.unknownStorage || 0)),
+      high: Boolean(Number(summary.highRisk || 0) || Number(summary.lost || 0))
+    },
+    profile: {
+      hasNetworkBackedStorage: Boolean(Number(summary.network || 0)),
+      hasNodeLocalStorage: Boolean(Number(summary.localPath || 0)),
+      hasPendingClaims: Boolean(Number(summary.pending || 0))
     }
   };
 }
 
 function publicAttention(attention = {}) {
-  const issues = (attention.issues || [])
-    .filter((item) => ["node-offline", "node-cordoned", "external-worker-offline", "deployment-unready", "pod-phase"].includes(item.kind))
-    .map((item) => ({
-      id: item.id,
-      severity: item.severity,
-      kind: item.kind,
-      title: item.title,
-      detail: item.detail,
-      namespace: item.namespace,
-      name: item.name,
-      node: item.node,
-      deployment: item.deployment
-    }));
+  const issues = (attention.issues || []).filter((item) =>
+    ["node-offline", "node-cordoned", "external-worker-offline", "deployment-unready", "pod-phase", "storage-risk", "capacity-pressure"].includes(item.kind)
+  );
+  const counts = {
+    node: 0,
+    workload: 0,
+    storage: 0,
+    capacity: 0,
+    externalAutomation: 0
+  };
+  for (const issue of issues) {
+    counts[publicIssueGroup(issue.kind)] += 1;
+  }
 
   return {
     total: issues.length,
@@ -387,24 +338,21 @@ function publicAttention(attention = {}) {
     warning: issues.filter((item) => item.severity === "warning").length,
     info: issues.filter((item) => item.severity === "info").length,
     highestSeverity: issues[0]?.severity || "healthy",
-    issues
+    byKind: counts
   };
 }
 
-function ensureNamespace(namespaces, namespace) {
-  if (!namespaces.has(namespace)) {
-    namespaces.set(namespace, {
-      namespace,
-      pods: 0,
-      runningPods: 0,
-      deployments: 0,
-      readyDeployments: 0,
-      replicas: 0,
-      readyReplicas: 0,
-      restarts: 0
-    });
-  }
-  return namespaces.get(namespace);
+function publicIssueGroup(kind) {
+  if (kind.startsWith("node-")) return "node";
+  if (kind.startsWith("external-worker")) return "externalAutomation";
+  if (kind.startsWith("storage")) return "storage";
+  if (kind.startsWith("capacity")) return "capacity";
+  return "workload";
+}
+
+function externalAutomationStatus(workers = []) {
+  if (!workers.length) return "not-configured";
+  return workers.every((worker) => worker.online) ? "available" : "attention";
 }
 
 function isDeploymentReady(deployment) {

@@ -58,13 +58,12 @@ function render() {
 function renderSummary() {
   const summary = state.snapshot.summary;
   const metrics = [
-    ["Nodes", `${summary.onlineNodes}/${summary.nodes}`],
-    ["Pods", `${summary.runningPods}/${summary.pods}`],
-    ["Deployments", `${summary.readyDeployments}/${summary.deployments}`],
-    ["Namespaces", summary.namespaces],
-    ["Workers", summary.workerNodes],
-    ["External", `${summary.externalWorkersOnline || 0}/${summary.externalWorkers || 0}`],
-    ["Containers", summary.containers]
+    ["Overall", summary.overall],
+    ["Control Plane", summary.controlPlane],
+    ["Workloads", summary.workloads],
+    ["Storage", summary.storage],
+    ["Capacity", summary.capacity],
+    ["Automation", summary.externalAutomation]
   ];
 
   els.summaryStrip.innerHTML = metrics.map(([label, value]) => `
@@ -77,9 +76,8 @@ function renderSummary() {
 }
 
 function renderAttention() {
-  const attention = state.snapshot.attention || { total: 0, issues: [] };
-  const issues = attention.issues || [];
-  const total = Number(attention.total || issues.length);
+  const attention = state.snapshot.attention || { total: 0, byKind: {} };
+  const total = Number(attention.total || 0);
   els.attentionPanel.className = `attention-panel ${total ? attention.highestSeverity || "warning" : "healthy"}`;
 
   if (!total) {
@@ -104,78 +102,74 @@ function renderAttention() {
       <span class="status-pill ${escapeAttr(attention.highestSeverity || "warning")}">${escapeHtml(attention.highestSeverity || "warning")}</span>
     </div>
     <div class="attention-list">
-      ${issues.slice(0, 4).map(issueRow).join("")}
+      ${issueGroupRows(attention.byKind || {}).join("")}
     </div>
   `;
 }
 
-function issueRow(issue) {
+function issueGroupRows(byKind) {
+  return Object.entries(byKind)
+    .filter(([, count]) => Number(count || 0) > 0)
+    .map(([kind, count]) => issueRow(kind, count));
+}
+
+function issueRow(kind, count) {
   return `
     <article class="attention-item">
-      <span class="status-pill ${escapeAttr(issue.severity)}">${escapeHtml(issue.severity)}</span>
+      <span class="status-pill warning">${escapeHtml(count)}</span>
       <div>
-        <h3>${escapeHtml(issue.title)}</h3>
-        <p>${escapeHtml(issue.detail)}</p>
+        <h3>${escapeHtml(kindLabel(kind))}</h3>
+        <p>Details are intentionally hidden from the public status view.</p>
       </div>
     </article>
   `;
 }
 
 function renderNodes() {
-  const nodes = state.snapshot.nodes || [];
-  if (!nodes.length) {
-    els.nodeList.innerHTML = `<div class="empty-state">No node data available</div>`;
-    return;
-  }
+  const health = state.snapshot.health || {};
+  const capacity = state.snapshot.capacity || {};
+  const storage = state.snapshot.storage || {};
+  const cards = [
+    ["Control plane", health.nodes || "unknown"],
+    ["Workloads", health.workloads || "unknown"],
+    ["Capacity", capacity.level || health.capacity || "unknown"],
+    ["Storage", storage.risk?.high ? "high risk" : storage.risk?.attention ? "attention" : health.storage || "unknown"]
+  ];
 
-  els.nodeList.innerHTML = nodes.map((node) => {
-    const status = node.online ? "online" : "offline";
-    const schedulable = node.schedulable ? "ready" : "paused";
-    const memoryPercent = node.capacity?.memory?.percentUsed;
-    const memoryLabel = Number.isFinite(memoryPercent) ? `${memoryPercent}% memory` : "memory unknown";
-    return `
-      <article class="public-node-card">
-        <div class="node-topline">
-          <span class="node-name">${escapeHtml(node.name)}</span>
-          <span class="status-pill ${status}">${status}</span>
-        </div>
-        <div class="node-meta">
-          <span>${escapeHtml(node.role)}</span>
-          <span>${escapeHtml(node.kubeletVersion || "unknown")}</span>
-          <span>${escapeHtml(node.architecture || "arch")}</span>
-        </div>
-        <div class="node-stats">
-          <span>${escapeHtml(node.podCount)} pods / ${escapeHtml(node.containerCount)} containers</span>
-          <span>${escapeHtml(memoryLabel)}</span>
-          <span class="status-pill ${schedulable}">${node.schedulable ? "schedulable" : "cordoned"}</span>
-        </div>
-      </article>
-    `;
-  }).join("");
+  els.nodeList.innerHTML = cards.map(([label, value]) => `
+    <article class="public-node-card">
+      <div class="node-topline">
+        <span class="node-name">${escapeHtml(label)}</span>
+        <span class="status-pill ${statusClass(value)}">${escapeHtml(value)}</span>
+      </div>
+      <div class="node-meta">
+        <span>Public summary</span>
+        <span>Inventory hidden</span>
+      </div>
+    </article>
+  `).join("");
 }
 
 function renderNamespaces() {
-  const namespaces = state.snapshot.namespaces || [];
-  els.namespaceCount.textContent = `${namespaces.length} total`;
-
-  if (!namespaces.length) {
-    els.namespaceRows.innerHTML = `<tr><td colspan="5" class="empty-state">No namespace data available</td></tr>`;
-    return;
-  }
-
-  els.namespaceRows.innerHTML = namespaces.map((item) => {
-    const deploymentsReady = item.readyDeployments === item.deployments;
-    const replicasReady = item.readyReplicas === item.replicas;
-    return `
-      <tr>
-        <td>${escapeHtml(item.namespace)}</td>
-        <td><span class="status-pill ${item.runningPods === item.pods ? "ready" : "pending"}">${escapeHtml(item.runningPods)}/${escapeHtml(item.pods)}</span></td>
-        <td><span class="status-pill ${deploymentsReady ? "ready" : "pending"}">${escapeHtml(item.readyDeployments)}/${escapeHtml(item.deployments)}</span></td>
-        <td><span class="status-pill ${replicasReady ? "ready" : "pending"}">${escapeHtml(item.readyReplicas)}/${escapeHtml(item.replicas)}</span></td>
-        <td>${escapeHtml(item.restarts)}</td>
-      </tr>
-    `;
-  }).join("");
+  els.namespaceCount.textContent = "hidden";
+  const storage = state.snapshot.storage || {};
+  const capacity = state.snapshot.capacity || {};
+  els.namespaceRows.innerHTML = `
+    <tr>
+      <td>Storage posture</td>
+      <td><span class="status-pill ${storage.risk?.high ? "pending" : "ready"}">${storage.available ? "available" : "unavailable"}</span></td>
+      <td><span class="status-pill ${storage.risk?.attention ? "pending" : "ready"}">${storage.risk?.attention ? "attention" : "normal"}</span></td>
+      <td><span class="status-pill ${storage.profile?.hasPendingClaims ? "pending" : "ready"}">${storage.profile?.hasPendingClaims ? "pending" : "settled"}</span></td>
+      <td>Hidden</td>
+    </tr>
+    <tr>
+      <td>Capacity posture</td>
+      <td><span class="status-pill ${statusClass(capacity.level)}">${escapeHtml(capacity.level || "unknown")}</span></td>
+      <td><span class="status-pill ${capacity.pressure?.high ? "pending" : "ready"}">${capacity.pressure?.high ? "high" : "not high"}</span></td>
+      <td><span class="status-pill ${capacity.pressure?.elevated ? "pending" : "ready"}">${capacity.pressure?.elevated ? "elevated" : "normal"}</span></td>
+      <td>Hidden</td>
+    </tr>
+  `;
 }
 
 async function fetchJson(url) {
@@ -217,6 +211,23 @@ function escapeHtml(value) {
 
 function escapeAttr(value) {
   return escapeHtml(value);
+}
+
+function kindLabel(kind) {
+  return {
+    node: "Node availability",
+    workload: "Workload readiness",
+    storage: "Storage posture",
+    capacity: "Capacity posture",
+    externalAutomation: "External automation"
+  }[kind] || "Cluster attention";
+}
+
+function statusClass(value) {
+  const text = String(value || "").toLowerCase();
+  if (["healthy", "normal", "available"].includes(text)) return "ready";
+  if (["attention", "elevated", "high risk", "high", "critical"].includes(text)) return "pending";
+  return "paused";
 }
 
 els.refreshButton.addEventListener("click", refreshCluster);

@@ -67,6 +67,10 @@ Public-safe demo paths should stay anonymous on both `chriswchang.com` and
 `/local-llm/*`, `/local-agent/*`, and `/cluster-status/*`. Keep Cloudflare
 Access required at the edge and origin for `/recruiting-app/*` and
 `/railroad-automation/*`.
+The `/cluster-status/` public proxy should only expose the
+`k8s-cluster-status` public-status mode, which now returns aggregate posture
+only: no node names, namespace names, worker names, workload names, PVC/PV
+names, exact inventory counts, image registry paths, or issue-level details.
 
 Pi-hole DNS is exposed separately as a `LoadBalancer` service on TCP/UDP `53`.
 The Pi-hole web UI is a separate ClusterIP service named `pihole-web` and is
@@ -100,7 +104,7 @@ kubectl exec deploy/pihole-pihole -- pihole-FTL --config dns.hosts
 | `home-assistant` | `ghcr.io/home-assistant/home-assistant:stable` | `homeassistant.lan` | `rpi5-control` | Ingress-only UI; host networking is disabled by default. Config path is `/srv/home-assistant` on the Pi. |
 | `homebridge` | `homebridge/homebridge:latest` | `homebridge.lan` | `rpi5-control` | Uses `hostNetwork: true` for HomeKit/mDNS reliability. Config path is `/srv/homebridge` on the Pi. |
 | `k8s-management-ui` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | `k8s.lan` | `rpi5-control` | LAN control panel for nodes, containers, deployments, read-only Metrics API capacity pressure, read-only PVC/PV/StorageClass readiness, and allowlisted kubectl controls. Mutating controls require UI confirmation and backend `confirmed: true` before execution; cluster-scoped RBAC remains the enforcement layer. |
-| `k8s-cluster-status` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | internal only | `rpi5-control` | Read-only public-status service for the portfolio `/cluster-status/` proxy. Uses read-only RBAC and sanitized aggregate output; capacity summaries omit detailed pod names, deployments scaled to `0` are inactive, and storage summaries omit PVC/PV/workload names. |
+| `k8s-cluster-status` | `ghcr.io/chrischang314/container-orchestrator/k8s-management-ui:main` | internal only | `rpi5-control` | Read-only public-status service for the portfolio `/cluster-status/` proxy. Uses read-only RBAC and aggregate-only output; capacity/storage/attention expose coarse posture only, deployments scaled to `0` are inactive, and node, namespace, workload, PVC/PV, worker, exact-count, and image details stay hidden. |
 | `local-agent` | `ghcr.io/chrischang314/local-agent/backend:main`, `frontend:main`, `worker:main` | `localagent.lan` | `mac-mini-worker` | Execution is intentionally enabled with required worker auth and one worker replica, but live rollout is blocked while `mac-mini-worker` is `NotReady`/unreachable. Backend readiness checks `/api/health/ready` with an extended timeout for dependency checks that touch Synology NFS; liveness is a tolerant TCP check to avoid restarts during short NFS or app stalls. The backend uses `strategy.type: Recreate` because the Mac Mini worker cannot reliably fit a second backend pod during a rolling-update surge. Keep live desktop/noVNC, cleanup unsuspend, and provider mutations gated until rollout health is restored and verified. |
 | `local-llm` | `ghcr.io/chrischang314/local-llm/*:main` | `localllm.lan` | `mac-mini-worker` | Backend reaches Ollama on the Mac host through `host.lima.internal:11434`, aliasing to `192.168.5.2`. |
 | `model-railroad-automation` | `ghcr.io/chrischang314/model-railroad-automation/web-control:main` | `modelrailroadautomation.lan` | `railroad-pi3` | Train web server; talks to DCC-EX at `192.168.4.22:2560`. Not shared-SSO mounted; deployed in direct browser-command mode. |
@@ -341,7 +345,9 @@ and pod volume consumers so operators can see which claims are node-local,
 pending, lost, unbound, or only partially inventoried before restarting,
 draining, or moving workloads. If PV or StorageClass reads fail, the endpoint
 still returns the rest of the cluster snapshot and marks `storage.partial=true`.
-The public `k8s-cluster-status` service exposes only aggregate storage counts.
+The public `k8s-cluster-status` service exposes only storage risk/profile
+booleans, not PVC/PV names, namespace names, workload consumers, or exact
+storage counts.
 
 ## K8s UI Mutation Safety
 
@@ -357,5 +363,6 @@ exact command, mutating/read-only classification, exit code, stdout, and stderr.
 `metrics.k8s.io` with node CPU/memory pressure and the top memory-consuming
 pods. If the Metrics API or RBAC is unavailable, the endpoint still succeeds
 with `capacity.available=false`. The LAN UI renders the detailed top-pod list;
-the public `k8s-cluster-status` mode exposes only node-pressure aggregates.
+the public `k8s-cluster-status` mode exposes only coarse capacity pressure
+levels and never exposes node names, percentages, or pod details.
 Both service accounts need read-only `metrics.k8s.io` access for nodes and pods.

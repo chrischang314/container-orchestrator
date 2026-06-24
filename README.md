@@ -351,12 +351,16 @@ internal `k8s-cluster-status` read-only service used by the public portfolio's
 API. `/api/cluster` reports node CPU/memory pressure and top memory-consuming
 pods when `metrics.k8s.io` is available, and keeps the rest of the cluster
 snapshot online with a clear unavailable state if Metrics API access fails. The
-public status deployment keeps detailed pod names out of its sanitized payload
-and treats `replicas: 0` deployments as inactive rather than unhealthy.
+public status deployment now returns aggregate posture only: no node rows,
+namespace rows, worker names, deployment names, PVC/PV names, exact inventory
+counts, top-pod details, image registry paths, or issue-level workload details.
+It still reports public-safe health states for control plane, workloads,
+capacity, storage, external automation, and issue counts by category. It treats
+`replicas: 0` deployments as inactive rather than unhealthy.
 It also includes read-only storage readiness data for PVCs, PVs, and
 StorageClasses when those Kubernetes API reads are allowed. The LAN dashboard
-shows PVC risk details, while the public status deployment exposes only
-aggregate storage counts.
+shows PVC risk details, while the public status deployment exposes only storage
+risk booleans and coarse storage profile booleans.
 
 For faster public deploys, the polling can be replaced by a webhook from
 Actions.
@@ -371,4 +375,4 @@ API. `GET /api/cluster` includes node CPU and memory pressure plus top memory
 pods when `metrics.k8s.io` is available, and falls back to
 `capacity.available=false` without breaking the rest of the snapshot when
 metrics are unavailable. The public `k8s-cluster-status` deployment receives
-only sanitized node-pressure aggregates, not detailed pod names.
+only sanitized capacity pressure levels, not node names or detailed pod names.

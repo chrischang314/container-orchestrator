@@ -38,9 +38,11 @@ and in-cluster service-account environment variables are present.
 Set `K8S_UI_PUBLIC_STATUS=true` for the status-only public deployment. In this
 mode the root page serves a read-only dashboard, `GET /api/cluster` returns a
 sanitized aggregate snapshot, and command/action endpoints return `403`.
-Capacity summaries remain available in public status mode, but detailed top-pod
-names are omitted. Deployments intentionally scaled to `0` replicas are treated
-as inactive rather than unhealthy so dormant worker switches do not create false
-public attention.
-Storage summaries remain available in public status mode, but PVC names, PV
-names, and workload-specific storage details are omitted.
+Capacity posture remains available in public status mode, but node names,
+node-level percentages, exact counts, and detailed top-pod names are omitted.
+Deployments intentionally scaled to `0` replicas are treated as inactive rather
+than unhealthy so dormant worker switches do not create false public attention.
+Storage posture remains available in public status mode, but namespace rows,
+PVC names, PV names, workload-specific storage details, and exact storage
+counts are omitted. Public attention data is grouped by category only, without
+workload, node, namespace, or pod names.
