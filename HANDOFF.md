@@ -333,6 +333,19 @@ curl.exe -I http://projects.lan/local-llm/
 curl.exe -I http://projects.lan/railroad-automation/
 curl.exe -I http://projects.lan/cluster-status/
 ```
+
+## Local Agent Digest Refresh
+
+`apps/local-agent/values.yaml` pins the 2026-06-25 `local-agent` release built
+from app commit `6cce4536f8d250a55e86a04f6ec39a1711c205dd`:
+
+- Backend: `sha256:17c6f7d26abca622c2dc19ab9b82f6ba1f7b14bc7d66674161d36beb5b31d019`
+- Frontend: `sha256:2eeaa1d5f141b856906254dd1da8e4ceae3f2da5fd40c97b7be04777358ff6da`
+- Worker: `sha256:e6d8c8465a809f3c61ef48d2e04c7ff296d591b31d580ee8e0615f1ddd1b16b3`
+
+Live rollout and LAN verification were intentionally not run while the Mac Mini
+worker was unavailable.
+
 ## Agent Operating Policy
 
 Project-specific Codex rules now live in `AGENTS.md`. Use them before adding worker nodes or deploying containers. The important rule is simple: after any deployment, verify Helm lint, rollout status, pod health/logs when needed, and the LAN or health endpoint before calling the work complete.
